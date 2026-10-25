@@ -1,0 +1,57 @@
+"""Application configuration loaded from the environment.
+
+The database URL is required; every other setting has a safe development
+default. Settings are cached so the application has one configuration object
+per process. Tests can call ``get_settings.cache_clear()`` after changing the
+environment.
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic import Field, ValidationError, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE = ROOT / ".env"
+
+
+class ConfigurationError(RuntimeError):
+    """Raised when required application configuration is missing."""
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="MUSAWIQ_",
+        env_file=str(ENV_FILE),
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    database_url: str = Field(..., min_length=1)
+    app_env: str = Field(default="development", min_length=1)
+    log_level: str = Field(default="INFO", min_length=1)
+
+    @field_validator("app_env")
+    @classmethod
+    def normalize_app_env(cls, value: str) -> str:
+        return value.strip().lower()
+
+    @field_validator("log_level")
+    @classmethod
+    def normalize_log_level(cls, value: str) -> str:
+        return value.strip().upper()
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    try:
+        return Settings()
+    except ValidationError as exc:
+        raise ConfigurationError(
+            "MUSAWIQ_DATABASE_URL is required and must not be empty "
+            "(for example postgresql+psycopg://user:pass@host:5432/db)"
+        ) from exc
