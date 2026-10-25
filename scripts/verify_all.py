@@ -39,7 +39,10 @@ def main() -> int:
     hard_results: list[tuple[str, bool]] = []
 
     hard_results.append(
-        ("verify_db", run("verify_db", [py, "-m", "scripts.verify_db"]))
+        (
+            "verify_db",
+            run("verify_db", [py, "-m", "scripts.verify_db", "--expect-rls"]),
+        )
     )
     # tests/db run inside verify_db, against its migrated scratch database.
     # Tool/audit tests provision their own scratch databases.
