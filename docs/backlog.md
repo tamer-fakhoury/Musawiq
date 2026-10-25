@@ -22,9 +22,10 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - Naming and folder conventions are documented in the repo.
 
 ### DB-0.2 Extensions, conventions, and shared primitives
-**TASK:** Install `pgcrypto`, `citext`, `pg_trgm`; add `fn_uuid_v7()` as the default for every `id`, `fn_touch_updated_at()` for mutable tables, and `fn_block_mutation()` for append-only tables.
+**TASK:** On PostgreSQL 18, use the native `uuidv7()` as the default for every `id`; install `citext` and `pg_trgm`; add `fn_touch_updated_at()` for mutable tables and `fn_block_mutation()` for append-only tables.
 **ACCEPTANCE CRITERIA:**
-- Every new row gets a UUIDv7 primary key by default.
+- Every new row gets a UUIDv7 primary key by default via native `uuidv7()` (no plpgsql shim).
+- `citext` and `pg_trgm` extensions installed; `pgcrypto` only if a hash function is needed.
 - `updated_at` auto-updates on mutating tables only.
 - `UPDATE`/`DELETE` on append-only tables raises an exception.
 - Enum-like columns use `text` + `CHECK`; no native `ENUM` types.

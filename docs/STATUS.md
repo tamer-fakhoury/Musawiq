@@ -45,7 +45,8 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 
 ## Environment
 
-- PostgreSQL: **18.3 installed locally** (project targets 16 — see open question)
+- PostgreSQL: **18.3** (adopted; native `uuidv7()`, `NULLS NOT DISTINCT`)
 - Python: 3.11.3
 - Git: 2.40.1
 - Verification: `python -m scripts.verify_db` (no CI host)
+- Credentials: `.env` (gitignored), maintained by the project owner
