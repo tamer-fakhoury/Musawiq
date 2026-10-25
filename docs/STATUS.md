@@ -17,8 +17,8 @@ States: `not_started` -> `in_review` -> `changes_requested` -> `accepted`.
 | DB-0.7 Product evaluation | accepted | 0b674f2 | 2026-10-25 | 5 tables; score_factors append-only |
 | DB-0.8 Recommendations | accepted | d722ee2 | 2026-10-25 | 3 tables; source_idea_id circular FK closed |
 | DB-0.9 Assets, campaigns & tests | accepted | 86fb877 | 2026-10-25 | 0.9a/0.9b/0.9c complete; 15 tables added |
-| DB-0.10 Measurement | in_review | - | - | Engineer 1: sessions/events/deposits/attribution/metrics |
-| DB-0.11 Optimization | not_started | - | - | - |
+| DB-0.10 Measurement | accepted | fc06b21 | 2026-10-25 | 5 tables; events/attributions append-only; 54 total |
+| DB-0.11 Optimization | in_review | - | - | Engineer 1: rule sets/findings/recommendations/actions/policy/alerts |
 | DB-0.12 Decision & investment | not_started | - | - | - |
 | DB-0.13 Integrity gate | not_started | - | - | Gate G2 |
 | DB-0.14 Indexing / audit | in_review | c9b2177 | 2026-10-25 | Audit refined (advisory vs required); **82 required FK columns unindexed** - migration after DB-0.12 |
@@ -27,45 +27,45 @@ States: `not_started` -> `in_review` -> `changes_requested` -> `accepted`.
 | DB-0.17 Concurrency | not_started | - | - | - |
 | DB-0.18 PII & encryption | accepted | 6072b85 | 2026-10-25 | `docs/PII.md` + `pii_scan.py`; scan PASS |
 | DB-0.19 Roles & privileges | accepted | 19248bc | 2026-10-25 | Authoring only: roles.sql + ROLES.md; 6 tool tests pass |
-| DB-0.20 Seeds & fixtures | not_started | - | - | - |
+| DB-0.20 Seeds & fixtures | accepted | 0f68d01 | 2026-10-25 | Deterministic seed + guide; rule-set rows pending DB-0.20b after DB-0.12 |
 | DB-0.21 Verification pipeline | accepted | a1a781e | 2026-10-25 | Audit report generation + tests |
 | DB-0.22 Performance baseline | accepted | 1cd15fb | 2026-10-25 | 4 queries PASS, p95 < 3 ms |
 | DB-0.23 Retention & purge | accepted | fe2dc71 | 2026-10-25 | Plan only (DB-0.23a) |
-| DB-0.24 Schema docs & traceability | accepted | 2f29462 | 2026-10-25 | Generator + 42-table doc + `--check` drift gate |
+| DB-0.24 Schema docs & traceability | accepted | 37cf122 | 2026-10-25 | Generator + 54-table doc + `--check` drift gate |
 
 ## Progress
 
 | Metric | Value |
 |---|---|
 | Backlog tasks total (DB-0.0..DB-0.24) | 25 |
-| Accepted | 17 |
+| Accepted | 19 |
 | In review / in progress | 1 |
-| Not started | 7 |
-| Schema tables | 49 |
-| Migration revisions | 0001..0011 |
-| Last green verification | `81 passed, 2 skipped`, `VERIFY OK` |
+| Not started | 5 |
+| Schema tables | 54 |
+| Migration revisions | 0001..0012 |
+| Last green verification | `92 passed, 2 skipped`, `VERIFY OK` |
 
-Accepted: DB-0.0-0.9, 0.16, 0.18, 0.19, 0.21, 0.22, 0.23, 0.24.
+Accepted: DB-0.0-0.10, 0.16, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24.
 In review: DB-0.14 (index gap).
-Not started: DB-0.10, 0.11, 0.12, 0.13, 0.15, 0.17, 0.20.
+Not started: DB-0.11, 0.12, 0.13, 0.15, 0.17.
 
 ## Current schema
 
-- Revision head: `0011`
-- 49 tables, 2 extensions, 2 functions
-- Last full verification: `PARITY OK (49 declared tables)`, `81 passed, 2 skipped`, `EMPTY OK`, `VERIFY OK`
+- Revision head: `0012`
+- 54 tables, 2 extensions, 2 functions
+- Last full verification: `PARITY OK (54 declared tables)`, `92 passed, 2 skipped`, `EMPTY OK`, `VERIFY OK`
 
 ## Team
 
 | Engineer | Session | Owns | Current |
 |---|---|---|---|
-| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations `versions/`, `schema_manifest.py`, `tests/db/` | DB-0.10 |
-| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | additive tooling/docs: `gen_schema_docs.py`, `SCHEMA.md`, `PARTITIONING.md`, `RETENTION.md`, `roles.sql`, `ROLES.md`, `pii_scan.py`, `seed_dev.py` | DB-0.20a dev seeds (WIP) |
+| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations `versions/`, `schema_manifest.py`, `tests/db/` | DB-0.11 |
+| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | additive tooling/docs: `gen_schema_docs.py`, `SCHEMA.md`, `PARTITIONING.md`, `RETENTION.md`, `roles.sql`, `ROLES.md`, `pii_scan.py`, `seed_dev.py`, `fk_matrix.py` | DB-0.13a FK matrix |
 | 3 | `ses_e8d249055fferTS2d662tFXtva` | - | **aborted**; WIP finished and committed by owner (`a1a781e`, `1cd15fb`) |
 
 ## Uncommitted work in the tree
 
-- `scripts/seed_dev.py`, `tests/tools/test_seed_dev.py` (Engineer 2)
+- none
 Collision rules: one task per commit; `git add <explicit paths>` only; no amends or reverts of other engineers' commits; owner files are read-only to all engineers.
 
 ## Phase 1+ - Application
@@ -97,6 +97,9 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 | 2026-10-25 | DB-0.9b | accepted | 4 tables; order_channels.post_id FK closed; 42 tables / 73 passed |
 | 2026-10-25 | DB-0.9c | accepted | 7 tables; test_id FKs closed; 49 tables / 81 passed |
 | 2026-10-25 | DB-0.14b | accepted | Audit refined: advisory lookup/actor FKs separated from required |
+| 2026-10-25 | DB-0.10 | accepted | 5 tables; NULLS NOT DISTINCT metrics; 54 tables / 92 passed |
+| 2026-10-25 | DB-0.20a | accepted | Seed idempotent; 13 rows; rule sets correctly SKIPPED until DB-0.11/0.12 |
+| 2026-10-25 | DB-0.24b | accepted | SCHEMA.md refreshed to 54 tables |
 | 2026-10-25 | DB-0.18a | accepted | PII registry + scanner; scan PASS |
 | 2026-10-25 | DB-0.24b | accepted | SCHEMA.md refreshed to 42 tables |
 | 2026-10-25 | DB-0.14a | accepted | Audit harness; **found 52+ unindexed FK columns** |
@@ -119,5 +122,7 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 - DB-0.13: add all deferred cross-domain FKs, then Gate G2.
 - DB-0.15: RLS policies; then Gate G3.
 - DB-0.24: regenerate `SCHEMA.md` after schema freeze.
-- DB-0.14 index migration must land after DB-0.12 (last table-creating task) and before DB-0.13/G2. Audit now separates required FK indexes (82 missing) from advisory lookup/actor columns (29 ignored).
+- DB-0.14 index migration must land after DB-0.12 (last table-creating task) and before DB-0.13/G2. Audit now separates required FK indexes from advisory lookup/actor columns; re-measure at the final table count.
+- DB-0.20b: after DB-0.11 and DB-0.12, extend `seed_dev.py` with the default `decision_rule_sets` and `optimization_rule_sets` rows it currently reports as SKIPPED.
+- DB-0.13a: FK matrix will list every remaining deferred reference for the integrity gate.
 - Tooling duplication: `audit_schema.py` and `bench_db.py` each reimplement scratch-DB creation; consolidate into `scripts/db_scratch.py` during DB-0.21 follow-up.
