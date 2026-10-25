@@ -16,7 +16,7 @@ States: `not_started` -> `in_review` -> `changes_requested` -> `accepted`.
 | DB-0.6 Audience & context | accepted | 4955135 | 2026-10-25 | 5 tables + products.category_id FK |
 | DB-0.7 Product evaluation | accepted | 0b674f2 | 2026-10-25 | 5 tables; score_factors append-only |
 | DB-0.8 Recommendations | accepted | d722ee2 | 2026-10-25 | 3 tables; source_idea_id circular FK closed |
-| DB-0.9 Assets, campaigns & tests | not_started | - | - | Split 0.9a/0.9b/0.9c; 0.9a assigned |
+| DB-0.9 Assets, campaigns & tests | in_review | ecacbce | 2026-10-25 | Split a/b/c; 0.9a accepted (38 tables); 0.9b next |
 | DB-0.10 Measurement | not_started | - | - | - |
 | DB-0.11 Optimization | not_started | - | - | - |
 | DB-0.12 Decision & investment | not_started | - | - | - |
@@ -31,41 +31,40 @@ States: `not_started` -> `in_review` -> `changes_requested` -> `accepted`.
 | DB-0.21 Verification pipeline | in_review | - | - | Engineer 3: audit reporting |
 | DB-0.22 Performance baseline | in_review | - | - | Engineer 3: bench_db.py |
 | DB-0.23 Retention & purge | accepted | fe2dc71 | 2026-10-25 | Plan only (DB-0.23a) |
-| DB-0.24 Schema docs & traceability | in_review | f7e6964 | 2026-10-25 | Generator accepted; final regeneration at schema freeze |
+| DB-0.24 Schema docs & traceability | accepted | c9e2dc1 | 2026-10-25 | Generator + 38-table doc + `--check` drift gate |
 
 ## Progress
 
 | Metric | Value |
 |---|---|
 | Backlog tasks total (DB-0.0..DB-0.24) | 25 |
-| Accepted | 12 |
-| In review / in progress | 4 |
-| Not started | 9 |
-| Schema tables | 34 |
-| Migration revisions | 0001..0008 |
-| Last green verification | `58 passed, 2 skipped`, `VERIFY OK` |
+| Accepted | 13 |
+| In review / in progress | 5 |
+| Not started | 7 |
+| Schema tables | 38 |
+| Migration revisions | 0001..0009 |
+| Last green verification | `65 passed, 2 skipped`, `VERIFY OK` |
 
-Accepted: DB-0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.16, 0.19, 0.23.
-In review: DB-0.14, 0.21, 0.22, 0.24.
-Not started: DB-0.9, 0.10, 0.11, 0.12, 0.13, 0.15, 0.17, 0.18, 0.20.
+Accepted: DB-0.0-0.8, 0.16, 0.19, 0.23, 0.24.
+In review: DB-0.9, 0.14, 0.18, 0.21, 0.22.
+Not started: DB-0.10, 0.11, 0.12, 0.13, 0.15, 0.17, 0.20.
 
 ## Current schema
 
-- Revision head: `0008`
-- 34 tables, 2 extensions, 2 functions
-- Last full verification: `PARITY OK (34 declared tables)`, `58 passed, 2 skipped`, `EMPTY OK`, `VERIFY OK`
+- Revision head: `0009`
+- 38 tables, 2 extensions, 2 functions
+- Last full verification: `PARITY OK (38 declared tables)`, `65 passed, 2 skipped`, `EMPTY OK`, `VERIFY OK`
 
 ## Team
 
 | Engineer | Session | Owns | Current |
 |---|---|---|---|
-| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations `versions/`, `schema_manifest.py`, `tests/db/` | DB-0.9a |
-| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | additive tooling/docs: `gen_schema_docs.py`, `SCHEMA.md`, `PARTITIONING.md`, `RETENTION.md`, `roles.sql`, `ROLES.md` | idle; `docs/SCHEMA.md` regenerated but uncommitted |
+| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations `versions/`, `schema_manifest.py`, `tests/db/` | DB-0.9b |
+| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | additive tooling/docs: `gen_schema_docs.py`, `SCHEMA.md`, `PARTITIONING.md`, `RETENTION.md`, `roles.sql`, `ROLES.md`, `pii_scan.py` | DB-0.18a PII scan (WIP) |
 | 3 | `ses_e8d249055fferTS2d662tFXtva` | `audit_schema.py`, `bench_db.py`, `AUDIT.md`, `PERFORMANCE.md`, `tests/audit/` | DB-0.14a/0.21a/0.22a (WIP, uncommitted) |
 
 ## Uncommitted work in the tree
 
-- `docs/SCHEMA.md` (Engineer 2 regeneration, pending commit)
 - `scripts/audit_schema.py`, `scripts/bench_db.py`, `docs/AUDIT.md`, `docs/PERFORMANCE.md`, `tests/audit/` (Engineer 3)
 - `audit_out.json` at repo root (Engineer 3 scratch output, must be deleted, never committed)
 
@@ -94,6 +93,9 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 | 2026-10-25 | DB-0.23a | accepted | Retention windows + purge order, plan only |
 | 2026-10-25 | DB-0.19a | accepted | roles.sql + ROLES.md; no secrets; static checks pass |
 | 2026-10-25 | DB-0.8 | accepted | 3 tables; verified 34 tables / 58 passed |
+| 2026-10-25 | DB-0.9a | accepted | 4 tables, circular FKs added via ALTER; 38 tables / 65 passed |
+| 2026-10-25 | DB-0.24b | accepted | SCHEMA.md regenerated for 38 tables |
+| 2026-10-25 | DB-0.24c | accepted | `--check` drift gate; 8 tool tests pass |
 | 2026-10-25 | docs | repaired | PowerShell round-trip had mojibake'd `backlog.md`; fixed 124 sequences |
 
 ## Environment
