@@ -49,6 +49,10 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 | 2026-10-25 | DB-0.3 | accepted | Pluralized (62c3831); 9 tables total |
 | 2026-10-25 | DB-0.4 | accepted | users/stores/audit_logs/async_jobs; 24 passed / 2 skipped; G1 passed |
 | 2026-10-25 | DB-0.5 | accepted | store_connections...import_issues; 21 tables; cross-domain FKs correctly deferred |
+| 2026-10-25 | DB-0.6 | accepted | categories/niches/audience_profiles/segments/feedback_items + products FK; 26 tables |
+| 2026-10-25 | DB-0.24a | accepted | Generator reproducible; 	ests/tools passes; traceability map explicit |
+| 2026-10-25 | DB-0.16a | accepted | Exact composite-PK ALTER plan documented |
+| 2026-10-25 | DB-0.23a | accepted | Windows, purge order, maintenance-role rules documented |
 
 ## Environment
 
@@ -59,5 +63,6 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 - Credentials: `.env` (gitignored, owner-maintained)
 - Role bootstrap: `musawiq_app` provisioned by owner; owns `musawiq` and `musawiq_test`
 - Scratch DBs: `verify_db` creates them owned by `musawiq_app`, so RLS is exercised as a non-superuser
+
 
 
