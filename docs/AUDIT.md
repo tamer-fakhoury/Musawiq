@@ -7,7 +7,7 @@ python -m scripts.audit_schema --scratch --write-report
 ```
 
 - PostgreSQL: 18.3
-- Tables: 49
+- Tables: 68
 - Checks: 6 passed, 1 failed, 0 skipped
 - Verdict: FAIL
 
@@ -17,22 +17,31 @@ python -m scripts.audit_schema --scratch --write-report
 
 Check id: `tables_declared`
 
-all 49 public tables are declared
+all 68 public tables are declared
 
 ### FAIL - Foreign-key columns have leading indexes
 
 Check id: `fk_indexes`
 
-82 foreign-key columns lack a leading index (29 advisory lookup/actor columns ignored)
+131 foreign-key columns lack a leading index (43 advisory lookup/actor columns ignored)
 
 - ad_sets.store_id (constraint fk_ad_sets_store_id)
 - ad_variations.creative_file_id (constraint fk_ad_variations_creative_file_id)
 - ad_variations.post_id (constraint fk_ad_variations_post_id)
 - ad_variations.primary_creative_id (constraint fk_ad_variations_primary_creative_id)
 - ad_variations.store_id (constraint fk_ad_variations_store_id)
+- alerts.acknowledged_by (constraint fk_alerts_acknowledged_by)
 - async_jobs.store_id (constraint fk_async_jobs_store_id)
+- attributions.ad_variation_id (constraint fk_attributions_ad_variation_id)
+- attributions.adset_id (constraint fk_attributions_adset_id)
+- attributions.campaign_id (constraint fk_attributions_campaign_id)
+- attributions.store_id (constraint fk_attributions_store_id)
+- attributions.test_id (constraint fk_attributions_test_id)
 - audience_segments.store_id (constraint fk_audience_segments_store_id)
 - audit_logs.store_id (constraint fk_audit_logs_store_id)
+- budget_policies.campaign_id (constraint fk_budget_policies_campaign_id)
+- budget_policies.store_id (constraint fk_budget_policies_store_id)
+- budget_policies.test_id (constraint fk_budget_policies_test_id)
 - campaigns.store_id (constraint fk_campaigns_store_id)
 - categories.parent_id (constraint fk_categories_parent_id)
 - column_mappings.store_id (constraint fk_column_mappings_store_id)
@@ -43,9 +52,19 @@ Check id: `fk_indexes`
 - creative_variants.stored_file_id (constraint fk_creative_variants_stored_file_id)
 - creatives.content_generation_job_id (constraint fk_creatives_content_generation_job_id)
 - creatives.stored_file_id (constraint fk_creatives_stored_file_id)
+- decision_rule_sets.category_id (constraint fk_decision_rule_sets_category_id)
+- demand_estimates.store_id (constraint fk_demand_estimates_store_id)
+- deposits.evidence_file_id (constraint fk_deposits_evidence_file_id)
+- deposits.store_id (constraint fk_deposits_store_id)
+- deposits.test_id (constraint fk_deposits_test_id)
 - evaluations.scoring_model_id (constraint fk_evaluations_scoring_model_id)
 - evaluations.store_id (constraint fk_evaluations_store_id)
 - evaluations.sufficiency_check_id (constraint fk_evaluations_sufficiency_check_id)
+- events.ad_variation_id (constraint fk_events_ad_variation_id)
+- events.adset_id (constraint fk_events_adset_id)
+- events.campaign_id (constraint fk_events_campaign_id)
+- events.product_id (constraint fk_events_product_id)
+- events.test_id (constraint fk_events_test_id)
 - feedback_items.audience_profile_id (constraint fk_feedback_items_audience_profile_id)
 - feedback_items.stored_file_id (constraint fk_feedback_items_stored_file_id)
 - generation_runs.store_id (constraint fk_generation_runs_store_id)
@@ -60,21 +79,42 @@ Check id: `fk_indexes`
 - import_issues.store_id (constraint fk_import_issues_store_id)
 - import_rows.created_order_id (constraint fk_import_rows_created_order_id)
 - import_rows.store_id (constraint fk_import_rows_store_id)
+- investment_profiles.store_id (constraint fk_investment_profiles_store_id)
+- investment_recommendations.investment_profile_id (constraint fk_investment_recommendations_investment_profile_id)
+- investment_recommendations.store_id (constraint fk_investment_recommendations_store_id)
 - landing_pages.current_version_id (constraint fk_landing_pages_current_version_id)
 - landing_pages.order_channel_id (constraint fk_landing_pages_order_channel_id)
 - landing_pages.product_concept_id (constraint fk_landing_pages_product_concept_id)
 - landing_pages.published_version_id (constraint fk_landing_pages_published_version_id)
 - landing_pages.template_id (constraint fk_landing_pages_template_id)
 - landing_pages.test_id (constraint fk_landing_pages_test_id)
+- metric_snapshots.ad_variation_id (constraint fk_metric_snapshots_ad_variation_id)
+- metric_snapshots.adset_id (constraint fk_metric_snapshots_adset_id)
+- metric_snapshots.store_id (constraint fk_metric_snapshots_store_id)
+- metric_snapshots.test_id (constraint fk_metric_snapshots_test_id)
 - niches.category_id (constraint fk_niches_category_id)
+- optimization_actions.ad_variation_id (constraint fk_optimization_actions_ad_variation_id)
+- optimization_actions.adset_id (constraint fk_optimization_actions_adset_id)
+- optimization_actions.recommendation_id (constraint fk_optimization_actions_recommendation_id)
+- optimization_actions.store_id (constraint fk_optimization_actions_store_id)
+- optimization_recommendations.ad_variation_id (constraint fk_optimization_recommendations_ad_variation_id)
+- optimization_recommendations.adset_id (constraint fk_optimization_recommendations_adset_id)
+- optimization_recommendations.finding_id (constraint fk_optimization_recommendations_finding_id)
+- optimization_recommendations.store_id (constraint fk_optimization_recommendations_store_id)
+- optimization_rule_sets.campaign_id (constraint fk_optimization_rule_sets_campaign_id)
 - order_channels.store_id (constraint fk_order_channels_store_id)
 - order_items.order_id (constraint fk_order_items_order_id)
 - order_items.product_id (constraint fk_order_items_product_id)
 - order_items.store_id (constraint fk_order_items_store_id)
 - orders.import_batch_id (constraint fk_orders_import_batch_id)
 - orders.test_id (constraint fk_orders_test_id)
+- orders.tracking_session_id (constraint fk_orders_tracking_session_id)
 - page_versions.order_channel_id (constraint fk_page_versions_order_channel_id)
 - page_versions.store_id (constraint fk_page_versions_store_id)
+- performance_findings.ad_variation_id (constraint fk_performance_findings_ad_variation_id)
+- performance_findings.adset_id (constraint fk_performance_findings_adset_id)
+- performance_findings.rule_set_id (constraint fk_performance_findings_rule_set_id)
+- performance_findings.store_id (constraint fk_performance_findings_store_id)
 - post_creatives.creative_id (constraint fk_post_creatives_creative_id)
 - post_creatives.store_id (constraint fk_post_creatives_store_id)
 - posts.order_channel_id (constraint fk_posts_order_channel_id)
@@ -93,11 +133,13 @@ Check id: `fk_indexes`
 - publication_attempts.ad_variation_id (constraint fk_publication_attempts_ad_variation_id)
 - publication_attempts.adset_id (constraint fk_publication_attempts_adset_id)
 - publication_attempts.store_id (constraint fk_publication_attempts_store_id)
+- quantity_scenarios.store_id (constraint fk_quantity_scenarios_store_id)
 - score_factors.store_id (constraint fk_score_factors_store_id)
 - scoring_models.store_id (constraint fk_scoring_models_store_id)
 - stored_files.store_id (constraint fk_stored_files_store_id)
 - sufficiency_checks.store_id (constraint fk_sufficiency_checks_store_id)
 - test_extensions.store_id (constraint fk_test_extensions_store_id)
+- test_result_snapshots.store_id (constraint fk_test_result_snapshots_store_id)
 - tests.landing_page_id (constraint fk_tests_landing_page_id)
 - tests.post_id (constraint fk_tests_post_id)
 - tests.product_concept_id (constraint fk_tests_product_concept_id)
@@ -107,18 +149,25 @@ Check id: `fk_indexes`
 - tracking_links.post_id (constraint fk_tracking_links_post_id)
 - tracking_links.store_id (constraint fk_tracking_links_store_id)
 - tracking_links.test_id (constraint fk_tracking_links_test_id)
+- tracking_sessions.campaign_id (constraint fk_tracking_sessions_campaign_id)
+- tracking_sessions.store_id (constraint fk_tracking_sessions_store_id)
+- tracking_sessions.test_id (constraint fk_tracking_sessions_test_id)
+- unit_economics.store_id (constraint fk_unit_economics_store_id)
+- verdicts.decision_rule_set_id (constraint fk_verdicts_decision_rule_set_id)
+- verdicts.result_snapshot_id (constraint fk_verdicts_result_snapshot_id)
+- verdicts.store_id (constraint fk_verdicts_store_id)
 
 ### PASS - Append-only tables block mutation and carry no updated_at
 
 Check id: `append_only_guards`
 
-all 2 append-only tables are guarded
+all 6 append-only tables are guarded
 
 ### PASS - Tables with store_id are classified
 
 Check id: `tenant_placement`
 
-all 40 tables with store_id are classified
+all 59 tables with store_id are classified
 
 ### PASS - No native enum types in public
 
@@ -130,10 +179,10 @@ no native enum types in public
 
 Check id: `primary_keys`
 
-all 49 public tables have a primary key
+all 68 public tables have a primary key
 
 ### PASS - No duplicate index definitions on a table
 
 Check id: `duplicate_indexes`
 
-all 102 indexes have distinct definitions per table
+all 145 indexes have distinct definitions per table

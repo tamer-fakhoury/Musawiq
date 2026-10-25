@@ -91,7 +91,8 @@
 ### Conventions
 
 - **Database:** PostgreSQL.
-- **Keys:** `id uuid` (UUIDv7) primary key on every entity.
+- **Physical naming:** entity names in this document are singular (`Order`, `User`), but physical tables are **plural snake_case** (`orders`, `users`) to avoid reserved-word quoting. Irregular plurals: `country`→`countries`, `currency`→`currencies`, `category`→`categories`, `budget_policy`→`budget_policies`.
+- **Keys:** `id uuid` (UUIDv7) primary key on every entity. **Exception:** reference tables (`countries`, `currencies`, `languages`, `ad_platforms`, `event_types`) use the natural `code` column as the primary key and carry no `id` or timestamps.
 - **Timestamps:** `created_at timestamptz`, `updated_at timestamptz` on mutable entities; append-only tables have `created_at` only.
 - **Tenancy:** every tenant-owned table carries `store_id uuid NOT NULL` even when derivable, for row-level security, partitioning, and index efficiency. **Exception:** `store` is the tenant root and carries no `store_id`.
 - **Platform-global rows:** `content_provider`, `niche`, `scoring_model`, `optimization_rule_set`, `decision_rule_set`, `async_job`, and `audit_log` allow a nullable `store_id` to represent platform defaults or system-wide actions.

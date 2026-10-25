@@ -261,7 +261,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 
 ## Module 0 — Platform Foundations (P0)
 
-### Task: FR-0.1 Store data isolation
+### FR-0.1 Store data isolation
 - **User Story:** As a merchant, I want my store data isolated so that no other merchant can access or affect it.
 - **Acceptance Criteria:**
   - Every domain record carries a `store_id`; all reads and writes are scoped to the authenticated store.
@@ -275,7 +275,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - PostgreSQL row-level security policies on tenant tables, including child tables (`OrderItem`, `ScoreFactor`, `ImportRow`).
 - **Notes:** Foundation for every other module. No schema rewrite needed for future multi-store (add `Membership` later).
 
-### Task: FR-0.2 Roles and spend approval
+### FR-0.2 Roles and spend approval
 - **User Story:** As a store owner, I want to control who can publish pages, launch campaigns, and approve spend.
 - **Acceptance Criteria:**
   - A documented permission matrix exists for Owner, Manager, and Analyst roles.
@@ -288,7 +288,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Server-side permission check on every privileged endpoint and use case.
 - **Notes:** Matrix must be written into the spec before build starts.
 
-### Task: FR-0.3 Audit trail
+### FR-0.3 Audit trail
 - **User Story:** As an owner, I want an immutable record of consequential actions so I can investigate changes.
 - **Acceptance Criteria:**
   - Logs capture actor, store, action, target, UTC timestamp, and before/after values for import commits, publications, budget changes, verdicts, and optimization actions.
@@ -301,7 +301,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Append-only enforcement: `created_at` only, no `updated_at`, no update/delete path in API or UI.
 - **Notes:** `AuditMeta` value object carries `actorUserId`, `actorType`, `correlationId`, `ipHash`.
 
-### Task: FR-0.4 Async jobs, idempotency, and status
+### FR-0.4 Async jobs, idempotency, and status
 - **User Story:** As a merchant, I want long-running operations to be reliable and not create duplicates when I retry.
 - **Acceptance Criteria:**
   - Imports, page generation, ad publication, and metric sync run as background jobs with states: queued, running, succeeded, failed, partial.
@@ -315,7 +315,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `CorrelationService.getCorrelationId()` / `.setCorrelationId(id)` for end-to-end traceability.
 - **Notes:** DB-backed queue is sufficient for MVP; Redis later without changing interfaces.
 
-### Task: FR-0.5 AI/model governance and degraded mode
+### FR-0.5 AI/model governance and degraded mode
 - **User Story:** As a platform operator, I want AI outputs to be versioned and safely degradable so the product remains trustworthy.
 - **Acceptance Criteria:**
   - Each AI output or score stores model/prompt/template version, input snapshot reference, and timestamp.
@@ -331,7 +331,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 
 ## Module 1.1 — Historical Store Data Import (P0)
 
-### Task: FR-1.1.1 CSV upload and format validation (+ file limits)
+### FR-1.1.1 CSV upload and format validation (+ file limits)
 - **User Story:** As a merchant, I want to upload a CSV of my historical sales so that I can reuse existing data without manual entry.
 - **Acceptance Criteria:**
   - Accepts `.csv` up to a configured limit (e.g., 20 MB) with a downloadable template.
@@ -345,7 +345,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Validation of extension, MIME type, size ceiling, encoding, and emptiness before accepting.
 - **Notes:** Staged file is purged by a retention job if no batch is created.
 
-### Task: FR-1.1.2 Column mapping
+### FR-1.1.2 Column mapping
 - **User Story:** As a merchant, I want to map my columns to the required fields so my records are interpreted correctly.
 - **Acceptance Criteria:**
   - Required fields: `product_id`, `product_name`, `order_date`, `quantity`, `sales_amount`; optional: `order_id`, `currency`, `sku`.
@@ -360,7 +360,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - One-to-one source/target constraint enforced server-side.
 - **Notes:** Sample values come from the staged rows; keep 3 samples per column.
 
-### Task: FR-1.1.3 Row validation and duplicate detection
+### FR-1.1.3 Row validation and duplicate detection
 - **User Story:** As a merchant, I want invalid rows identified before import so I can fix them.
 - **Acceptance Criteria:**
   - Validates required values, date parsing (store timezone), integer quantity > 0, numeric amount ≥ 0, valid currency, and product consistency.
@@ -377,7 +377,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Date parsing uses `Store.timezone`; quantity must be integer > 0; amount numeric ≥ 0; currency must be a known ISO 4217 code.
 - **Notes:** Validation must run as a background job for large files; staged rows are purgeable.
 
-### Task: FR-1.1.4 Preview and error review before commit
+### FR-1.1.4 Preview and error review before commit
 - **User Story:** As a merchant, I want to review imported records and errors before saving so I can verify accuracy.
 - **Acceptance Criteria:**
   - Displays a sample of valid rows plus all errors (paginated or downloadable as an error report).
@@ -391,7 +391,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Cancel sets `ImportBatch.status = cancelled` and deletes staged `ImportRow`/`ImportIssue` rows only.
 - **Notes:** Preview is strictly read-only against domain tables.
 
-### Task: FR-1.1.5 Commit and import summary
+### FR-1.1.5 Commit and import summary
 - **User Story:** As a merchant, I want a clear summary after import so I know exactly what was accepted.
 - **Acceptance Criteria:**
   - Commit is transactional; accepted rows are written with an `import_id`.
@@ -409,7 +409,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `IImportService.getImportHistory(storeId, filters)` for the history list.
 - **Notes:** Update policy (skip / update / reject-existing) must be an explicit merchant choice at commit time.
 
-### Task: FR-1.1.6 E-commerce integration connect and historical import
+### FR-1.1.6 E-commerce integration connect and historical import
 - **User Story:** As a merchant, I want to connect my store so I can import historical data without exporting it manually.
 - **Acceptance Criteria:**
   - Supported platform connects via OAuth/API key with read-only catalog and order scopes.
@@ -427,7 +427,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 
 ## Module 1.2 — Customer Preference and Audience Profiling (P0)
 
-### Task: FR-1.2.1 Product category and niche
+### FR-1.2.1 Product category and niche
 - **User Story:** As a store manager, I want to select my category and niche so recommendations match my business.
 - **Acceptance Criteria:**
   - Merchant can select one or more categories from a taxonomy.
@@ -441,7 +441,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Custom niche name length limit enforced server-side.
 - **Notes:** Seed the global taxonomy before onboarding is usable.
 
-### Task: FR-1.2.2 Target customer profile
+### FR-1.2.2 Target customer profile
 - **User Story:** As a store manager, I want to define my target audience so evaluations reflect my intended customers.
 - **Acceptance Criteria:**
   - Captures target location(s), age range, interests, and preferred language(s).
@@ -456,7 +456,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `IAudienceService.upsertProfile(storeId, dto)` / `upsertSegment(profileId, dto)`.
 - **Notes:** Location values validated against the `Country` reference table.
 
-### Task: FR-1.2.3 Customer feedback intake
+### FR-1.2.3 Customer feedback intake
 - **User Story:** As a store manager, I want to submit customer feedback so recommendations account for stated needs.
 - **Acceptance Criteria:**
   - Accepts manual text entry or a supported file (`.csv`, `.txt`, `.xlsx`), with type/size/encoding validation.
@@ -470,7 +470,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Rejection reasons surfaced per file/field without echoing PII.
 - **Notes:** Feedback text may contain PII — document consent and retention handling before launch.
 
-### Task: FR-1.2.4 Save, version, and consume audience profile
+### FR-1.2.4 Save, version, and consume audience profile
 - **User Story:** As a store manager, I want profile updates to apply predictably to future evaluations.
 - **Acceptance Criteria:**
   - Each save creates a new profile version.
@@ -486,7 +486,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 
 ## Module 2.1 — Proprietary Product Assessment and Scoring (P0)
 
-### Task: FR-2.1.1 Create a product concept with validation
+### FR-2.1.1 Create a product concept with validation
 - **User Story:** As a brand owner, I want to enter my product details so the platform can evaluate the concept.
 - **Acceptance Criteria:**
   - Captures name, description, category, proposed price, estimated cost, currency, and optional image.
@@ -500,7 +500,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Image upload to `StoredFile` (`purpose = product_image`) with type/size validation.
 - **Notes:** `ProductConcept` is separate from `Product` (canonical catalogue product); no silent coupling.
 
-### Task: FR-2.1.2 Manage multiple concepts and lifecycle
+### FR-2.1.2 Manage multiple concepts and lifecycle
 - **User Story:** As a brand owner, I want to submit and manage multiple concepts so I can prioritize a portfolio.
 - **Acceptance Criteria:**
   - Merchant can list, create, edit, archive, and search concepts.
@@ -514,7 +514,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `ProductConcept.version int` for optimistic concurrency on edits.
 - **Notes:** State transitions are explicit; archive is reversible, hard delete is not.
 
-### Task: FR-2.1.3 Data sufficiency assessment
+### FR-2.1.3 Data sufficiency assessment
 - **User Story:** As a brand owner, I want to know whether there is enough data before trusting a score.
 - **Acceptance Criteria:**
   - Checks sales history volume/period, audience completeness, price/cost, and optional competitive data.
@@ -528,7 +528,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `blocking_reasons` names the exact missing input; no default substitution.
 - **Notes:** Sales history volume/period thresholds must be documented before build.
 
-### Task: FR-2.1.4 Viability scoring
+### FR-2.1.4 Viability scoring
 - **User Story:** As a brand owner, I want a viability score so I can prioritize before paying for tests.
 - **Acceptance Criteria:**
   - Produces a score on a documented scale using a versioned, documented model.
@@ -544,7 +544,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Determinism guaranteed: same `input_snapshot` + model version → identical score.
 - **Notes:** Decision D6 — rules-based v1 for explainability and reproducibility.
 
-### Task: FR-2.1.5 Score explanation and limitations
+### FR-2.1.5 Score explanation and limitations
 - **User Story:** As a brand owner, I want to understand what drives a score so I can judge its reliability.
 - **Acceptance Criteria:**
   - Displays the top positive and negative contributing factors with contribution values.
@@ -558,7 +558,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Copy guardrails: no guarantee-of-sales wording in any score surface.
 - **Notes:** Limitations list is derived from the matching `SufficiencyCheck`.
 
-### Task: FR-2.1.6 Compare, sort, and select concepts
+### FR-2.1.6 Compare, sort, and select concepts
 - **User Story:** As a brand owner, I want to compare scores so I can choose which concepts to test first.
 - **Acceptance Criteria:**
   - Side-by-side comparison of evaluated concepts with score and key metrics.
@@ -573,7 +573,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 
 ## Module 2.2 — Automated Product Recommendation Engine (P0)
 
-### Task: FR-2.2.1 Generate recommendations
+### FR-2.2.1 Generate recommendations
 - **User Story:** As a merchant, I want product ideas based on my niche and audience so I can find expansion opportunities.
 - **Acceptance Criteria:**
   - On-demand generation uses niche, audience profile, sales history, and trend/competitive data when available.
@@ -588,7 +588,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `IRecommendationService.getIdeas(storeId, filters)` for the library list.
 - **Notes:** Depends on decision D3 (competitive data source); degrade gracefully when unavailable.
 
-### Task: FR-2.2.2 Rationale and evidence provenance
+### FR-2.2.2 Rationale and evidence provenance
 - **User Story:** As a merchant, I want to understand why an idea is recommended so I can judge relevance.
 - **Acceptance Criteria:**
   - Each idea includes a description, rationale, and evidence list.
@@ -603,7 +603,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - UI renders verified vs hypothesis with distinct treatment; no link rendered without a stored source.
 - **Notes:** No fabricated sources — the UI must never synthesize a link from model output.
 
-### Task: FR-2.2.3 Save or dismiss ideas
+### FR-2.2.3 Save or dismiss ideas
 - **User Story:** As a merchant, I want to save or dismiss ideas so my library stays relevant.
 - **Acceptance Criteria:**
   - Merchant can save an idea to the library or dismiss it with an optional reason.
@@ -615,7 +615,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Dismissed ideas excluded from generation dedup candidates until explicitly restored.
 - **Notes:** Dismissal is per store (MVP is one store per user), with user attribution retained in audit.
 
-### Task: FR-2.2.4 Convert an idea into a product concept
+### FR-2.2.4 Convert an idea into a product concept
 - **User Story:** As a merchant, I want to turn an idea into a concept so I can evaluate it.
 - **Acceptance Criteria:**
   - Conversion prefills an editable concept with the idea's details.
@@ -631,7 +631,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 
 ## Module 3.1 — Automated Micro-Landing Page Builder (P0)
 
-### Task: FR-3.1.1 Product input and page options
+### FR-3.1.1 Product input and page options
 - **User Story:** As an e-commerce seller, I want to enter product details and options so a page can be generated.
 - **Acceptance Criteria:**
   - Captures image (JPG/PNG/WebP with type and size limits), name, description, price, currency, language, target market, and order method.
@@ -646,7 +646,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Order method limited to WhatsApp or COD via `OrderChannel`.
 - **Notes:** Language drives copy generation and RTL layout; target market drives phone/address validation.
 
-### Task: FR-3.1.2 Generate a responsive landing page
+### FR-3.1.2 Generate a responsive landing page
 - **User Story:** As an e-commerce seller, I want a generated page so I do not have to build one manually.
 - **Acceptance Criteria:**
   - Uses a predefined responsive template containing image, name, description, price, and CTA.
@@ -661,7 +661,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Failure path stores `AsyncJob.error_code` / `error_message` and offers a safe retry.
 - **Notes:** Performance budget: P95 ≤ 5 minutes for generation.
 
-### Task: FR-3.1.3 Product copy generation and editing
+### FR-3.1.3 Product copy generation and editing
 - **User Story:** As an e-commerce seller, I want copy in my market's language so the page fits my audience.
 - **Acceptance Criteria:**
   - Generates copy in the selected language and market, including RTL layout where applicable.
@@ -676,7 +676,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Regeneration is allowed and does not overwrite manual edits without explicit confirmation.
 - **Notes:** Decision D8 (markets, currencies, RTL) constrains the supported set for v1.
 
-### Task: FR-3.1.4 Ordering mechanism
+### FR-3.1.4 Ordering mechanism
 - **User Story:** As an e-commerce seller, I want WhatsApp or COD ordering so customers can order in the way they expect.
 - **Acceptance Criteria:**
   - WhatsApp option produces a `wa.me` deep link with a prefilled message and attribution token.
@@ -690,7 +690,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `ILandingPageService.configureOrderChannel(pageId, dto)`; pre-publish verification of link and required form fields.
 - **Notes:** Attribution token comes from `TrackingLink` so WhatsApp clicks can be attributed.
 
-### Task: FR-3.1.5 Preview, edit, publish, and shareable URL
+### FR-3.1.5 Preview, edit, publish, and shareable URL
 - **User Story:** As an e-commerce seller, I want to review and publish my page so I keep control of presentation.
 - **Acceptance Criteria:**
   - Preview is available in desktop and mobile views.
@@ -709,7 +709,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 
 ## Module 3.2 — Dynamic Social Ad Creative and Campaign Setup (P0)
 
-### Task: FR-3.2.1 Generate ad copy variations
+### FR-3.2.1 Generate ad copy variations
 - **User Story:** As a digital marketer, I want multiple ad copy variations so I can test different messages.
 - **Acceptance Criteria:**
   - Generates a configurable number of distinct variations (default 3–5) from product and landing-page data.
@@ -724,7 +724,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Variations inherit the campaign language and link to the ad set's product/page.
 - **Notes:** Copy generation reuses the same claim filter as landing-page copy.
 
-### Task: FR-3.2.2 Review, edit, approve, or discard variations
+### FR-3.2.2 Review, edit, approve, or discard variations
 - **User Story:** As a digital marketer, I want to curate variations so only approved messages run.
 - **Acceptance Criteria:**
   - Each variation can be edited, approved, or discarded.
@@ -738,7 +738,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Pre-flight blocks submission when the approved count is zero.
 - **Notes:** Approval actions are audited with the approving user.
 
-### Task: FR-3.2.3 Campaign configuration
+### FR-3.2.3 Campaign configuration
 - **User Story:** As a digital marketer, I want to configure platform, audience, budget, and duration so the test has defined parameters.
 - **Acceptance Criteria:**
   - Captures platform, objective, audience (location/age/interests or saved audience), budget, currency, and start/end or duration.
@@ -752,7 +752,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Targeting may reuse the current `AudienceProfile`/`AudienceSegment` as the saved audience.
 - **Notes:** Targeting JSONB requires a `schema_version` key per the scalability notes.
 
-### Task: FR-3.2.4 Campaign association and tracking parameters
+### FR-3.2.4 Campaign association and tracking parameters
 - **User Story:** As a digital marketer, I want the campaign linked to its product and page so results are attributable.
 - **Acceptance Criteria:**
   - Campaign links to exactly one product and one landing page.
@@ -766,7 +766,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Publication blocked when `destination_url` is missing or lacks valid tracking parameters.
 - **Notes:** `AdVariation` CHECK requires `post_id` or `destination_url`.
 
-### Task: FR-3.2.5 Validation and preview before submission
+### FR-3.2.5 Validation and preview before submission
 - **User Story:** As a digital marketer, I want a pre-flight check so I do not submit an invalid campaign.
 - **Acceptance Criteria:**
   - Pre-flight verifies connected account, approved creative, valid budget, live landing page, and tracking parameters.
@@ -778,7 +778,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Ad preview renders copy, creative, and destination URL for each approved variation.
 - **Notes:** The same validation list is shown pre-publish and pre-submit.
 
-### Task: FR-3.2.6 Advertising account authorization
+### FR-3.2.6 Advertising account authorization
 - **User Story:** As a digital marketer, I want to connect an ad account so the platform can publish campaigns.
 - **Acceptance Criteria:**
   - OAuth connection to each supported platform with minimal scopes.
@@ -792,7 +792,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Disconnect sets `status = revoked` and stops sync; expired/revoked states surface in pre-flight.
 - **Notes:** Decision D1 sets the platform set for MVP; implement the interface so more platforms can be added without changes.
 
-### Task: FR-3.2.7 Publish campaign and report status
+### FR-3.2.7 Publish campaign and report status
 - **User Story:** As a digital marketer, I want to publish an approved campaign and see the result so I can launch without manual recreation.
 - **Acceptance Criteria:**
   - Publication requires explicit merchant approval.
@@ -811,7 +811,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 
 ## Module 4.1 — Behavioral Tracking and Regional Conversion Intent (P0)
 
-### Task: FR-4.1.1 Event model and ingestion
+### FR-4.1.1 Event model and ingestion
 - **User Story:** As a merchant, I want consistent event tracking so I can compare intent signals reliably.
 - **Acceptance Criteria:**
   - Canonical events: `page_view`, `product_view`, `cta_click`, `whatsapp_click`, `cod_form_start`, `cod_order_submitted`, `deposit_confirmed`.
@@ -826,7 +826,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Indexes on `(store_id, event_type, occurred_at)` and `tracking_session_id`.
 - **Notes:** `Event` and `Order` and `MetricSnapshot` are the high-volume tables — partition by month when volume grows.
 
-### Task: FR-4.1.2 Landing-page visit and interaction tracking
+### FR-4.1.2 Landing-page visit and interaction tracking
 - **User Story:** As a merchant, I want page visits and interactions recorded so I can measure funnel entry.
 - **Acceptance Criteria:**
   - First-party tracking runs on published pages.
@@ -842,7 +842,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Consent gate before non-essential tracking; `ip_hash` only, never raw IP.
 - **Notes:** Consent state stored per session and honoured on the ingest endpoint.
 
-### Task: FR-4.1.3 WhatsApp click tracking
+### FR-4.1.3 WhatsApp click tracking
 - **User Story:** As a merchant, I want WhatsApp clicks tracked so I can measure expressed interest.
 - **Acceptance Criteria:**
   - CTA routes through a tracked redirect and then forwards to `wa.me`.
@@ -856,7 +856,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Metric layer enforces: `whatsapp_click` never contributes to confirmed orders or deposits.
 - **Notes:** Intent signal only — must be labelled as such in the dashboard.
 
-### Task: FR-4.1.4 COD order form and submission
+### FR-4.1.4 COD order form and submission
 - **User Story:** As a merchant, I want customers to submit COD orders so I can measure purchase intent without online payment.
 - **Acceptance Criteria:**
   - Form collects name, phone, address, quantity, and optional variant/notes.
@@ -874,7 +874,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `RateLimitService.checkLimit(key, policy)` plus spam heuristics (honeypot, minimum fill time).
 - **Notes:** `Order.customer_address_enc` is ciphertext; PII access is restricted.
 
-### Task: FR-4.1.5 Deposit confirmation
+### FR-4.1.5 Deposit confirmation
 - **User Story:** As a merchant, I want confirmed deposits distinguished from unconfirmed interest.
 - **Acceptance Criteria:**
   - Deposits are recorded only through a supported mechanism: manual verification with evidence or a payment webhook.
@@ -890,7 +890,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Every status change audited with actor, before/after.
 - **Notes:** MVP uses manual verification with evidence; payment gateway deferred (D2).
 
-### Task: FR-4.1.6 Attribution rules
+### FR-4.1.6 Attribution rules
 - **User Story:** As a merchant, I want clear attribution rules so metrics are not misleading.
 - **Acceptance Criteria:**
   - A documented attribution model is applied (e.g., last-touch within a session plus campaign parameters).
@@ -905,7 +905,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Coverage metric: attributed subjects أ· total subjects, shown on the dashboard.
 - **Notes:** Decision D4 — no reliable WhatsApp → order identity handoff; use store-scoped token + self-reported order code. Multi-touch deferred.
 
-### Task: FR-4.1.7 Conversion metrics dashboard
+### FR-4.1.7 Conversion metrics dashboard
 - **User Story:** As a merchant, I want to compare visits, WhatsApp clicks, and orders so I can understand customer response.
 - **Acceptance Criteria:**
   - Displays visits, WhatsApp clicks, COD submissions, and confirmed deposits by product and campaign.
@@ -923,7 +923,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 
 ## Module 5.1 — Automated Go / No-Go Demand Verdict (P0)
 
-### Task: FR-5.1.1 Retrieve test results
+### FR-5.1.1 Retrieve test results
 - **User Story:** As a merchant, I want the system to collect all test results so the verdict is based on complete data.
 - **Acceptance Criteria:**
   - Pulls spend, impressions, clicks, and tracked conversion events for the test window.
@@ -937,7 +937,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `data_completeness` reflects missing metric sources; partial data recorded explicitly, not silently zero-filled.
 - **Notes:** The snapshot is immutable and is the sole input to verdict evaluation.
 
-### Task: FR-5.1.2 Verdict KPI calculation
+### FR-5.1.2 Verdict KPI calculation
 - **User Story:** As a merchant, I want defined performance indicators so the verdict is understandable.
 - **Acceptance Criteria:**
   - Computes conversion rate, cost per tracked conversion, cost per confirmed deposit (or the defined primary conversion), and total spend.
@@ -951,7 +951,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Formula strings returned with the snapshot and rendered in the UI.
 - **Notes:** Unavailable metrics must render as N/A, never 0.
 
-### Task: FR-5.1.3 Decision rule configuration
+### FR-5.1.3 Decision rule configuration
 - **User Story:** As a merchant, I want configurable decision rules so verdicts match my economics.
 - **Acceptance Criteria:**
   - Rules include minimum conversion rate, maximum cost per conversion relative to margin, and minimum spend/clicks.
@@ -965,7 +965,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Active rule set displayed with the verdict (key, version, thresholds).
 - **Notes:** `rules jsonb` requires a `schema_version` key.
 
-### Task: FR-5.1.4 Verdict classification
+### FR-5.1.4 Verdict classification
 - **User Story:** As a merchant, I want a clear Go, No-Go, or Extend Test classification so I can decide.
 - **Acceptance Criteria:**
   - Output is exactly one of Go, No-Go, or Extend Test.
@@ -980,7 +980,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `Test.status` transitions to `awaiting_verdict` / `completed` / `extended` accordingly.
 - **Notes:** `rule_trace` records every rule evaluated, its threshold, observed value, and pass/fail.
 
-### Task: FR-5.1.5 Verdict explanation and limitations
+### FR-5.1.5 Verdict explanation and limitations
 - **User Story:** As a merchant, I want to see why a verdict was reached so I can make an informed decision.
 - **Acceptance Criteria:**
   - Displays key metrics and which thresholds were met or missed.
@@ -994,7 +994,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Copy guardrails: no outcome guarantees in verdict surfaces.
 - **Notes:** `limitations` and `rule_trace` are JSONB with a `schema_version` key.
 
-### Task: FR-5.1.6 Inconclusive test detection
+### FR-5.1.6 Inconclusive test detection
 - **User Story:** As a merchant, I want inconclusive tests identified so I do not act on weak evidence.
 - **Acceptance Criteria:**
   - Flags insufficient traffic, spend, conversions, missing tracking, or unreliable attribution.
@@ -1006,7 +1006,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Each triggering condition listed in `limitations`.
 - **Notes:** Prevents false Go/No-Go outcomes on thin data.
 
-### Task: FR-5.1.7 Extend a test
+### FR-5.1.7 Extend a test
 - **User Story:** As a merchant, I want to extend an inconclusive test so I can gather more evidence.
 - **Acceptance Criteria:**
   - Merchant can extend with explicit additional budget and duration.
@@ -1025,7 +1025,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 
 ## Module 5.2 — Predictive Batch Quantity and Investment Recommendation (P0)
 
-### Task: FR-5.2.1 Collect investment inputs
+### FR-5.2.1 Collect investment inputs
 - **User Story:** As a store owner, I want to enter costs and budget so recommendations reflect my constraints.
 - **Acceptance Criteria:**
   - Collects unit cost, selling price, fulfillment/shipping, payment fees, available budget, target margin, supplier MOQ, and lead time.
@@ -1039,7 +1039,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Missing inputs returned as an explicit list of missing fields; no default substitution.
 - **Notes:** `Money` value object enforces minor units and currency consistency.
 
-### Task: FR-5.2.2 Demand estimation with stated assumptions
+### FR-5.2.2 Demand estimation with stated assumptions
 - **User Story:** As a store owner, I want a demand estimate that explains its assumptions so I understand the risk.
 - **Acceptance Criteria:**
   - Converts test conversion data into a low/base/high demand range.
@@ -1054,7 +1054,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Always rendered as a range; no single-point output.
 - **Notes:** `assumptions jsonb` requires a `schema_version` key; range ordering enforced low ≤ base ≤ high.
 
-### Task: FR-5.2.3 Unit economics
+### FR-5.2.3 Unit economics
 - **User Story:** As a store owner, I want unit economics so I can judge profitability before ordering.
 - **Acceptance Criteria:**
   - Computes contribution margin per unit (price − COGS − fulfillment − fees).
@@ -1070,7 +1070,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `formulas jsonb` stores the rendered formula text for display.
 - **Notes:** Negative margin is flagged prominently, not just numerically.
 
-### Task: FR-5.2.4 Compute feasible order quantities
+### FR-5.2.4 Compute feasible order quantities
 - **User Story:** As a store owner, I want recommended quantities that respect my budget and supplier constraints.
 - **Acceptance Criteria:**
   - Proposes at least two scenarios (e.g., conservative, base, aggressive) when data is sufficient.
@@ -1085,7 +1085,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Infeasible scenarios excluded with a reason; when no scenario passes, return an explanation instead of numbers.
 - **Notes:** Lead time is surfaced as a constraint note (arrival before or after the selling window).
 
-### Task: FR-5.2.5 Scenario presentation and risk
+### FR-5.2.5 Scenario presentation and risk
 - **User Story:** As a store owner, I want compare quantities so I understand the trade-off between risk and opportunity.
 - **Acceptance Criteria:**
   - Each scenario shows inventory cost, expected units sold, revenue range, profit range, and sell-through %.
@@ -1099,7 +1099,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Assumptions rendered from `DemandEstimate.assumptions` plus per-scenario notes.
 - **Notes:** Ranges, not point values, in the UI.
 
-### Task: FR-5.2.6 Adjust assumptions and recalculate with versioning
+### FR-5.2.6 Adjust assumptions and recalculate with versioning
 - **User Story:** As a store owner, I want to change assumptions and recalculate so I can evaluate alternatives.
 - **Acceptance Criteria:**
   - Merchant can edit supported assumptions, costs, and budget.
@@ -1116,7 +1116,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 
 ## Module 4.2 — Optimization (MVP cut: recommendations only)
 
-### Task: FR-4.2.5 Optimization recommendations (MVP, recommend-only)
+### FR-4.2.5 Optimization recommendations (MVP, recommend-only)
 - **User Story:** As a merchant, I want recommended actions I can approve so optimization stays under my control.
 - **Acceptance Criteria:**
   - Generates recommendations such as pause, keep, or reallocate, with rationale and expected impact.
