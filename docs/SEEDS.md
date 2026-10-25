@@ -27,8 +27,8 @@ Every row has a fixed UUID and is inserted with `ON CONFLICT DO NOTHING`.
 | `categories` | 2 | A small tree: `home-kitchen` and child `kitchen-gadgets`. |
 | `niches` | 2 | One global `coffee-tea` niche and one store-specific `home-barista` niche. |
 | `scoring_models` | 2 | Platform default (`store_id NULL`, key `default`, v1) and store model (`dev-store`, v1). |
-| `decision_rule_sets` | 1 when present | Platform default (`store_id NULL`, category `NULL`, v1). Skipped at the current head because the table does not exist yet. |
-| `optimization_rule_sets` | 1 when present | Global default (`store_id NULL`, scope `global`, v1). Skipped at the current head because the table does not exist yet. |
+| `decision_rule_sets` | 2 | Platform default (`store_id NULL`, category `NULL`, v1) and a `dev-store` row (category `NULL`, v1) with development minimums: 500.00 SAR spend, 100 clicks, 10 conversions, 5 confirmed deposits, 2% conversion rate, 50.00 SAR max cost per conversion. |
+| `optimization_rule_sets` | 2 | Global default (`store_id NULL`, scope `global`, v1) and a `dev-store` row (scope `store`, v1): 1,000 impressions, 50 clicks, 5 conversions, 1% CTR floor, 3.00 SAR CPC ceiling, 50.00 SAR cost-per-conversion ceiling. |
 | `audience_profiles` | 1 | Current v1 profile for `dev-store`, both niches, Arabic. |
 | `audience_segments` | 2 | `Young Professionals` (Riyadh, 25-40) and `Families` (Jeddah, 30-50). |
 
@@ -53,7 +53,9 @@ version `1` cannot coexist.
 | Platform scoring model | `77777777-7777-4777-8777-777777777771` |
 | Store scoring model | `77777777-7777-4777-8777-777777777772` |
 | Platform decision rule set | `88888888-8888-4888-8888-888888888881` |
+| Store decision rule set | `88888888-8888-4888-8888-888888888882` |
 | Global optimization rule set | `99999999-9999-4999-8999-999999999991` |
+| Store optimization rule set | `99999999-9999-4999-8999-999999999992` |
 | Audience profile | `aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1` |
 | Segment: professionals | `bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1` |
 | Segment: families | `bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2` |
@@ -86,26 +88,29 @@ stores                               1         0
 categories                           2         0
 niches                               2         0
 scoring_models                       2         0
-decision_rule_sets                   0         0  SKIPPED: table not present at this head
-optimization_rule_sets               0         0  SKIPPED: table not present at this head
+decision_rule_sets                   2         0
+optimization_rule_sets               2         0
 audience_profiles                    1         0
 audience_segments                    2         0
 ------------------------------------------------------------------------------
-TOTAL                               13         0
+TOTAL                               17         0
 ```
 
-A second run reports `TOTAL 0 13` (everything skipped) and leaves row counts
+A second run reports `TOTAL 0 17` (everything skipped) and leaves row counts
 unchanged.
 
-## 4. Current-head limitation
+## 4. Rule sets
 
-At head `0011` the `decision_rule_sets` and `optimization_rule_sets` tables do
-not exist yet (DB-0.11/DB-0.12). The seed checks `to_regclass()` and reports those
-two rows as `SKIPPED` rather than failing. Rerun the seed after those migrations
-land; the inserts are already written against the specification columns.
+Both rule-set tables exist from DB-0.12 onward, so the seed no longer skips them.
+The natural keys are:
 
-If a future migration changes those columns, the conditional insert is the place
-to update. Until then the seed is green on the current head.
+- `decision_rule_sets(store_id, category_id, version)` with `NULLS NOT DISTINCT`;
+- `optimization_rule_sets(store_id, scope, campaign_id, version)` with `NULLS
+  NOT DISTINCT`.
+
+The platform rows use `store_id NULL`; the store rows use `dev-store`. Re-running
+the seed is safe because the fixed UUIDs and natural keys both conflict with the
+existing rows and `ON CONFLICT DO NOTHING` leaves them untouched.
 
 ## 5. Reset
 

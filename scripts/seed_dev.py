@@ -46,7 +46,9 @@ NICHE_STORE_ID = "66666666-6666-4666-8666-666666666662"
 SCORING_PLATFORM_ID = "77777777-7777-4777-8777-777777777771"
 SCORING_STORE_ID = "77777777-7777-4777-8777-777777777772"
 DECISION_PLATFORM_ID = "88888888-8888-4888-8888-888888888881"
+DECISION_STORE_ID = "88888888-8888-4888-8888-888888888882"
 OPTIMIZATION_GLOBAL_ID = "99999999-9999-4999-8999-999999999991"
+OPTIMIZATION_STORE_ID = "99999999-9999-4999-8999-999999999992"
 AUDIENCE_PROFILE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
 SEGMENT_PROFESSIONALS_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1"
 SEGMENT_FAMILIES_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2"
@@ -105,9 +107,7 @@ def require_development() -> None:
         raise SeedRefused(error)
 
 
-def build_result(
-    counts: dict[str, list[int]], notes: dict[str, str]
-) -> SeedResult:
+def build_result(counts: dict[str, list[int]]) -> SeedResult:
     items = []
     for label in SUMMARY_ORDER:
         inserted, skipped = counts.get(label, [0, 0])
@@ -116,7 +116,6 @@ def build_result(
                 label=label,
                 inserted=inserted,
                 skipped=skipped,
-                note=notes.get(label, ""),
             )
         )
     return SeedResult(items=tuple(items))
@@ -126,7 +125,6 @@ def seed_database(url: str) -> SeedResult:
     require_development()
 
     counts: dict[str, list[int]] = {}
-    notes: dict[str, str] = {}
 
     with psycopg.connect(libpq_url(url)) as conn:
         with conn.cursor() as cur:
@@ -331,79 +329,125 @@ def seed_database(url: str) -> SeedResult:
                 ),
             )
 
-            # Platform decision and optimization defaults (future tables) ----
-            cur.execute(
-                "SELECT to_regclass('public.decision_rule_sets') IS NOT NULL"
-            )
-            if not cur.fetchone()[0]:
-                notes["decision_rule_sets"] = "SKIPPED: table not present at this head"
-            else:
-                insert(
-                    "decision_rule_sets",
-                    """
-                    INSERT INTO public.decision_rule_sets (
-                        id, store_id, category_id, version, is_active,
-                        min_spend_minor, min_clicks, min_conversions,
-                        min_confirmed_deposits, min_conversion_rate,
-                        max_cost_per_conversion_minor, rules, created_by,
-                        created_at, updated_at
-                    ) VALUES (
-                        %s, NULL, NULL, 1, true, 0, 0, 0, 0, 0, 0, %s, %s,
-                        %s::timestamptz, %s::timestamptz
-                    )
-                    ON CONFLICT DO NOTHING
-                    """,
-                    (
-                        DECISION_PLATFORM_ID,
-                        Jsonb(
-                            {
-                                "schema_version": 1,
-                                "seed": "dev",
-                                "notes": "platform default",
-                            }
-                        ),
-                        OWNER_ID,
-                        SEED_TIMESTAMP,
-                        SEED_TIMESTAMP,
-                    ),
+            # Decision rule sets -----------------------------------------------
+            insert(
+                "decision_rule_sets",
+                """
+                INSERT INTO public.decision_rule_sets (
+                    id, store_id, category_id, version, is_active,
+                    min_spend_minor, min_clicks, min_conversions,
+                    min_confirmed_deposits, min_conversion_rate,
+                    max_cost_per_conversion_minor, rules, created_by,
+                    created_at, updated_at
+                ) VALUES (
+                    %s, NULL, NULL, 1, true, 0, 0, 0, 0, 0, 0, %s, %s,
+                    %s::timestamptz, %s::timestamptz
                 )
+                ON CONFLICT DO NOTHING
+                """,
+                (
+                    DECISION_PLATFORM_ID,
+                    Jsonb(
+                        {
+                            "schema_version": 1,
+                            "seed": "dev",
+                            "notes": "platform default",
+                        }
+                    ),
+                    OWNER_ID,
+                    SEED_TIMESTAMP,
+                    SEED_TIMESTAMP,
+                ),
+            )
+            insert(
+                "decision_rule_sets",
+                """
+                INSERT INTO public.decision_rule_sets (
+                    id, store_id, category_id, version, is_active,
+                    min_spend_minor, min_clicks, min_conversions,
+                    min_confirmed_deposits, min_conversion_rate,
+                    max_cost_per_conversion_minor, rules, created_by,
+                    created_at, updated_at
+                ) VALUES (
+                    %s, %s, NULL, 1, true, 50000, 100, 10, 5, 0.02, 5000,
+                    %s, %s, %s::timestamptz, %s::timestamptz
+                )
+                ON CONFLICT DO NOTHING
+                """,
+                (
+                    DECISION_STORE_ID,
+                    STORE_ID,
+                    Jsonb(
+                        {
+                            "schema_version": 1,
+                            "seed": "dev",
+                            "notes": "dev-store defaults",
+                        }
+                    ),
+                    OWNER_ID,
+                    SEED_TIMESTAMP,
+                    SEED_TIMESTAMP,
+                ),
+            )
 
-            cur.execute(
-                "SELECT to_regclass('public.optimization_rule_sets') IS NOT NULL"
-            )
-            if not cur.fetchone()[0]:
-                notes["optimization_rule_sets"] = (
-                    "SKIPPED: table not present at this head"
+            # Optimization rule sets -------------------------------------------
+            insert(
+                "optimization_rule_sets",
+                """
+                INSERT INTO public.optimization_rule_sets (
+                    id, store_id, scope, campaign_id, version, is_active,
+                    min_impressions, min_clicks, min_conversions, ctr_floor,
+                    cpc_ceiling_minor, cost_per_conversion_ceiling_minor,
+                    rules, created_by, created_at, updated_at
+                ) VALUES (
+                    %s, NULL, 'global', NULL, 1, true, 0, 0, 0, 0, 0, 0,
+                    %s, %s, %s::timestamptz, %s::timestamptz
                 )
-            else:
-                insert(
-                    "optimization_rule_sets",
-                    """
-                    INSERT INTO public.optimization_rule_sets (
-                        id, store_id, scope, campaign_id, version, is_active,
-                        min_impressions, min_clicks, min_conversions, ctr_floor,
-                        cpc_ceiling_minor, cost_per_conversion_ceiling_minor,
-                        rules, created_by, created_at, updated_at
-                    ) VALUES (
-                        %s, NULL, 'global', NULL, 1, true, 0, 0, 0, 0, 0, 0,
-                        %s, %s, %s::timestamptz, %s::timestamptz
-                    )
-                    ON CONFLICT DO NOTHING
-                    """,
-                    (
-                        OPTIMIZATION_GLOBAL_ID,
-                        Jsonb(
-                            {
-                                "schema_version": 1,
-                                "seed": "dev",
-                                "notes": "global default",
-                            }
-                        ),
-                        OWNER_ID,
-                        SEED_TIMESTAMP,
-                        SEED_TIMESTAMP,
+                ON CONFLICT DO NOTHING
+                """,
+                (
+                    OPTIMIZATION_GLOBAL_ID,
+                    Jsonb(
+                        {
+                            "schema_version": 1,
+                            "seed": "dev",
+                            "notes": "global default",
+                        }
                     ),
+                    OWNER_ID,
+                    SEED_TIMESTAMP,
+                    SEED_TIMESTAMP,
+                ),
+            )
+            insert(
+                "optimization_rule_sets",
+                """
+                INSERT INTO public.optimization_rule_sets (
+                    id, store_id, scope, campaign_id, version, is_active,
+                    min_impressions, min_clicks, min_conversions, ctr_floor,
+                    cpc_ceiling_minor, cost_per_conversion_ceiling_minor,
+                    rules, created_by, created_at, updated_at
+                ) VALUES (
+                    %s, %s, 'store', NULL, 1, true, 1000, 50, 5, 0.01, 300, 5000,
+                    %s, %s, %s::timestamptz, %s::timestamptz
                 )
+                ON CONFLICT DO NOTHING
+                """,
+                (
+                    OPTIMIZATION_STORE_ID,
+                    STORE_ID,
+                    Jsonb(
+                        {
+                            "schema_version": 1,
+                            "seed": "dev",
+                            "notes": "dev-store defaults",
+                        }
+                    ),
+                    OWNER_ID,
+                    SEED_TIMESTAMP,
+                    SEED_TIMESTAMP,
+                ),
+            )
 
             # Audience profile and segments -----------------------------------
             insert(
@@ -501,7 +545,7 @@ def seed_database(url: str) -> SeedResult:
                     ),
                 )
 
-    return build_result(counts, notes)
+    return build_result(counts)
 
 
 def print_summary(result: SeedResult) -> None:

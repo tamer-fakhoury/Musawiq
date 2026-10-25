@@ -25,6 +25,29 @@ def _counts(url: str) -> dict[str, int]:
         "categories": "SELECT count(*) FROM public.categories",
         "niches": "SELECT count(*) FROM public.niches",
         "scoring_models": "SELECT count(*) FROM public.scoring_models",
+        "decision_rule_sets": "SELECT count(*) FROM public.decision_rule_sets",
+        "decision_platform": (
+            "SELECT count(*) FROM public.decision_rule_sets "
+            "WHERE store_id IS NULL AND category_id IS NULL AND version = 1"
+        ),
+        "decision_store": (
+            "SELECT count(*) FROM public.decision_rule_sets "
+            "WHERE store_id = '44444444-4444-4444-8444-444444444444'::uuid "
+            "AND category_id IS NULL AND version = 1"
+        ),
+        "optimization_rule_sets": (
+            "SELECT count(*) FROM public.optimization_rule_sets"
+        ),
+        "optimization_global": (
+            "SELECT count(*) FROM public.optimization_rule_sets "
+            "WHERE store_id IS NULL AND scope = 'global' "
+            "AND campaign_id IS NULL AND version = 1"
+        ),
+        "optimization_store": (
+            "SELECT count(*) FROM public.optimization_rule_sets "
+            "WHERE store_id = '44444444-4444-4444-8444-444444444444'::uuid "
+            "AND scope = 'store' AND campaign_id IS NULL AND version = 1"
+        ),
         "audience_profiles": "SELECT count(*) FROM public.audience_profiles",
         "audience_segments": "SELECT count(*) FROM public.audience_segments",
     }
@@ -58,8 +81,9 @@ def test_seed_twice_is_idempotent(monkeypatch) -> None:
             )
             owner = cur.fetchone()
 
-    assert first.total_inserted > 0
+    assert first.total_inserted == 17
     assert second.total_inserted == 0
+    assert second.total_skipped == 17
     assert first_counts == second_counts
     assert first_counts["users"] == 3
     assert first_counts["owner_users"] == 1
@@ -68,9 +92,27 @@ def test_seed_twice_is_idempotent(monkeypatch) -> None:
     assert first_counts["categories"] == 2
     assert first_counts["niches"] == 2
     assert first_counts["scoring_models"] == 2
+    assert first_counts["decision_rule_sets"] == 2
+    assert first_counts["decision_platform"] == 1
+    assert first_counts["decision_store"] == 1
+    assert first_counts["optimization_rule_sets"] == 2
+    assert first_counts["optimization_global"] == 1
+    assert first_counts["optimization_store"] == 1
     assert first_counts["audience_profiles"] == 1
     assert first_counts["audience_segments"] == 2
     assert owner == ("owner", "active")
+
+    first_items = {item.label: item for item in first.items}
+    second_items = {item.label: item for item in second.items}
+    for label, count in (
+        ("decision_rule_sets", 2),
+        ("optimization_rule_sets", 2),
+    ):
+        assert first_items[label].inserted == count
+        assert first_items[label].skipped == 0
+        assert first_items[label].note == ""
+        assert second_items[label].inserted == 0
+        assert second_items[label].skipped == count
 
 
 def test_refuses_without_seed_environment(monkeypatch, capsys) -> None:
