@@ -15,7 +15,7 @@ States: `not_started` -> `in_review` -> `changes_requested` -> `accepted`.
 | DB-0.5 Integrations & ingestion | accepted | 4b92de5 | 2026-10-25 | 12 tables; cross-domain FKs deferred |
 | DB-0.6 Audience & context | accepted | 4955135 | 2026-10-25 | 5 tables + products.category_id FK |
 | DB-0.7 Product evaluation | accepted | 0b674f2 | 2026-10-25 | 5 tables; score_factors append-only |
-| DB-0.8 Recommendations | not_started | - | - | Next for Engineer 1 |
+| DB-0.8 Recommendations | in_review | - | - | Engineer 1: `0008_recommendations.py` written, uncommitted |
 | DB-0.9 Assets, campaigns & tests | not_started | - | - | - |
 | DB-0.10 Measurement | not_started | - | - | - |
 | DB-0.11 Optimization | not_started | - | - | - |
@@ -26,12 +26,28 @@ States: `not_started` -> `in_review` -> `changes_requested` -> `accepted`.
 | DB-0.16 Partitioning | accepted | e4fc6c8 | 2026-10-25 | Plan only (DB-0.16a); apply when volume justifies |
 | DB-0.17 Concurrency | not_started | - | - | - |
 | DB-0.18 PII & encryption | not_started | - | - | - |
-| DB-0.19 Roles & privileges | in_review | - | - | Engineer 2: roles.sql + ROLES.md |
+| DB-0.19 Roles & privileges | accepted | 19248bc | 2026-10-25 | Authoring only: roles.sql + ROLES.md; 6 tool tests pass |
 | DB-0.20 Seeds & fixtures | not_started | - | - | - |
 | DB-0.21 Verification pipeline | in_review | - | - | Engineer 3: audit reporting |
 | DB-0.22 Performance baseline | in_review | - | - | Engineer 3: bench_db.py |
 | DB-0.23 Retention & purge | accepted | fe2dc71 | 2026-10-25 | Plan only (DB-0.23a) |
 | DB-0.24 Schema docs & traceability | in_review | f7e6964 | 2026-10-25 | Generator accepted; final regeneration at schema freeze |
+
+## Progress
+
+| Metric | Value |
+|---|---|
+| Backlog tasks total (DB-0.0..DB-0.24) | 25 |
+| Accepted | 11 |
+| In review / in progress | 5 |
+| Not started | 9 |
+| Schema tables | 31 |
+| Migration revisions | 0001..0007 |
+| Last green verification | `51 passed, 2 skipped`, `VERIFY OK` |
+
+Accepted: DB-0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.16, 0.19, 0.23.
+In review: DB-0.8, 0.14, 0.21, 0.22, 0.24.
+Not started: DB-0.9, 0.10, 0.11, 0.12, 0.13, 0.15, 0.17, 0.18, 0.20.
 
 ## Current schema
 
@@ -43,9 +59,9 @@ States: `not_started` -> `in_review` -> `changes_requested` -> `accepted`.
 
 | Engineer | Session | Owns | Current |
 |---|---|---|---|
-| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations `versions/`, `schema_manifest.py`, `tests/db/` | DB-0.8 |
-| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | additive tooling/docs: `gen_schema_docs.py`, `SCHEMA.md`, `PARTITIONING.md`, `RETENTION.md`, `roles.sql`, `ROLES.md` | DB-0.19a |
-| 3 | `ses_e8d249055fferTS2d662tFXtva` | `audit_schema.py`, `bench_db.py`, `AUDIT.md`, `PERFORMANCE.md`, `tests/audit/` | DB-0.14a/0.21a/0.22a |
+| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations `versions/`, `schema_manifest.py`, `tests/db/` | DB-0.8 (writing `0008`, uncommitted) |
+| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | additive tooling/docs: `gen_schema_docs.py`, `SCHEMA.md`, `PARTITIONING.md`, `RETENTION.md`, `roles.sql`, `ROLES.md` | idle after `19248bc`; awaiting next assignment |
+| 3 | `ses_e8d249055fferTS2d662tFXtva` | `audit_schema.py`, `bench_db.py`, `AUDIT.md`, `PERFORMANCE.md`, `tests/audit/` | DB-0.14a/0.21a/0.22a (WIP, uncommitted) |
 
 Collision rules: one task per commit; `git add <explicit paths>` only; no amends or reverts of other engineers' commits; owner files are read-only to all engineers.
 
@@ -70,6 +86,7 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 | 2026-10-25 | DB-0.24a | accepted | Schema docs generator + generated SCHEMA.md |
 | 2026-10-25 | DB-0.16a | accepted | Partitioning ALTER plan, plan only |
 | 2026-10-25 | DB-0.23a | accepted | Retention windows + purge order, plan only |
+| 2026-10-25 | DB-0.19a | accepted | roles.sql + ROLES.md; no secrets; static checks pass |
 | 2026-10-25 | docs | repaired | PowerShell round-trip had mojibake'd `backlog.md`; fixed 124 sequences |
 
 ## Environment
