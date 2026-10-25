@@ -5,7 +5,7 @@ MVP cut: Slices A + B + C + D + E, plus FR-4.2.5 (recommendations only).
 
 ---
 
-# Phase 0 â€” Database Construction (must be first)
+# Phase 0 — Database Construction (must be first)
 
 Build the schema before any application feature. Each task is complete only when the migration
 runs clean on a fresh database, rolls back cleanly, and matches `## Entity Fields` and the
@@ -32,7 +32,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 6. RLS policy is attached where the table is tenant-owned (from DB-0.15).
 7. The migration is committed with the parity/regression evidence that guards it.
 
-## Module DB â€” Schema Construction (P0)
+## Module DB — Schema Construction (P0)
 
 ### DB-0.1 Migration tooling and project baseline
 **TASK:** Configure a versioned migration tool with an ordered migration directory, one migration per DB task, committed generated SQL, and a `schema_migrations` tracking table.
@@ -110,7 +110,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - `generation_run.status` CHECK (`queued|running|succeeded|failed`).
 - `product_idea.state` CHECK (`new|saved|dismissed|converted`).
 - `idea_evidence.evidence_type` CHECK (`verified|hypothesis`) and CHECK (`evidence_type <> 'verified' OR source_url IS NOT NULL`).
-- Deferred FK `product_concept.source_idea_id â†’ product_idea.id` added.
+- Deferred FK `product_concept.source_idea_id → product_idea.id` added.
 - Indexes: `product_idea(store_id, state)`, `idea_evidence(product_idea_id)`.
 
 ### DB-0.9 Assets, posts, campaigns & tests tables
@@ -152,7 +152,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - `decision_rule_set` UNIQUE **NULLS NOT DISTINCT** `(store_id, category_id, version)`.`
 - `test_result_snapshot.data_completeness numeric(5,4)`; `source_metric_snapshot_ids uuid[]`.
 - `investment_profile` UNIQUE `(test_id, version)`; `investment_recommendation` UNIQUE `(test_id, version)`; both have `is_current`.
-- `demand_estimate.confidence` CHECK (`high|medium|low`); range order low â‰¤ base â‰¤ high enforced.
+- `demand_estimate.confidence` CHECK (`high|medium|low`); range order low ≤ base ≤ high enforced.
 - `quantity_scenario.label` CHECK (`conservative|base|aggressive`); `overstock_risk`/`stockout_risk` CHECK (`low|medium|high`).
 - `unit_economics.break_even_units numeric(12,2)`.
 - Indexes: `verdict(test_id)`, `test_result_snapshot(test_id, captured_at)`, `investment_recommendation(test_id, version)`.
@@ -218,15 +218,15 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - Credentials come from environment/secret store; TLS required; per-role timeouts set.
 
 ### DB-0.20 Seeds, fixtures, and migration verification
-**TASK:** Create idempotent development seed (demo store, owner/manager/analyst users, taxonomy, default scoring model, default decision rule set, default optimization rule set) and a migration upâ†’downâ†’up verification.
+**TASK:** Create idempotent development seed (demo store, owner/manager/analyst users, taxonomy, default scoring model, default decision rule set, default optimization rule set) and a migration up→down→up verification.
 **ACCEPTANCE CRITERIA:**
 - Seed runs only outside production and is re-runnable.
 - Default platform records exist: `ScoringModel` (`default`, v1), `DecisionRuleSet` (platform default), `OptimizationRuleSet` (`global`).
-- CI runs up â†’ down â†’ up cleanly on an empty database.
+- CI runs up → down → up cleanly on an empty database.
 - Spec parity check passes.
 
 ### DB-0.21 CI migration pipeline and rollback drill
-**TASK:** Build the CI pipeline `migrate-up â†’ test-schema â†’ test-constraints â†’ test-rls â†’ migrate-down`, plus a rehearsal of recovering from a failed forward migration.
+**TASK:** Build the CI pipeline `migrate-up → test-schema → test-constraints → test-rls → migrate-down`, plus a rehearsal of recovering from a failed forward migration.
 **ACCEPTANCE CRITERIA:**
 - Build fails on any migration error, parity diff, constraint test failure, or RLS bypass.
 - Migration checksum/lock prevents editing an applied migration.
@@ -244,8 +244,8 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 ### DB-0.23 Retention and purge jobs
 **TASK:** Implement batched, idempotent purge jobs with documented retention windows per table class.
 **ACCEPTANCE CRITERIA:**
-- Retention documented: audit â‰¥ 12 months, events/sessions configurable, transient import staging, staged `stored_file` with no batch.
-- Purge respects FK order (issues â†’ rows â†’ batches) and never breaks integrity.
+- Retention documented: audit ≥ 12 months, events/sessions configurable, transient import staging, staged `stored_file` with no batch.
+- Purge respects FK order (issues → rows → batches) and never breaks integrity.
 - Soft-deleted rows have a documented hard-delete window.
 - Purge runs under the maintenance role and writes an `audit_log` entry (`actor_type = service`).
 
@@ -254,12 +254,12 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 **ACCEPTANCE CRITERIA:**
 - Docs cover every table, column, type, nullability, default, and constraint.
 - Each table cross-references its `## Entity Fields` entry and ERD relationship.
-- Traceability matrix maps DB tasks â†’ spec sections.
+- Traceability matrix maps DB tasks → spec sections.
 - Undocumented drift fails the build.
 
 ---
 
-## Module 0 â€” Platform Foundations (P0)
+## Module 0 — Platform Foundations (P0)
 
 ### Task: FR-0.1 Store data isolation
 - **User Story:** As a merchant, I want my store data isolated so that no other merchant can access or affect it.
@@ -283,7 +283,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Every privileged action is attributed to a user.
   - Unauthorized attempts are blocked with a clear message.
 - **Functional Specifications:**
-  - `User.role text` â€” `owner | manager | analyst`.
+  - `User.role text` — `owner | manager | analyst`.
   - `IAuthorizationService.checkPermission(storeId, userId, action)` returns `PermissionResult`.
   - Server-side permission check on every privileged endpoint and use case.
 - **Notes:** Matrix must be written into the spec before build starts.
@@ -292,7 +292,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - **User Story:** As an owner, I want an immutable record of consequential actions so I can investigate changes.
 - **Acceptance Criteria:**
   - Logs capture actor, store, action, target, UTC timestamp, and before/after values for import commits, publications, budget changes, verdicts, and optimization actions.
-  - Logs are append-only and retained for a configurable period (default â‰¥12 months).
+  - Logs are append-only and retained for a configurable period (default ≥12 months).
   - Owner can filter and export by date, user, and target.
   - Log entries cannot be edited through the UI or API.
 - **Functional Specifications:**
@@ -329,7 +329,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - UI label on AI-generated copy and creative assets.
 - **Notes:** Cross-cutting; enforce during every AI-backed task, not as a separate feature.
 
-## Module 1.1 â€” Historical Store Data Import (P0)
+## Module 1.1 — Historical Store Data Import (P0)
 
 ### Task: FR-1.1.1 CSV upload and format validation (+ file limits)
 - **User Story:** As a merchant, I want to upload a CSV of my historical sales so that I can reuse existing data without manual entry.
@@ -339,7 +339,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Uploaded files are staged only; no sales records are written at this step.
   - Success or failure is reported unambiguously.
 - **Functional Specifications:**
-  - `IImportService.uploadCsv(storeId, file: Stream)` â†’ `StoredFile` with `purpose = sales_csv`, `status = staged`.
+  - `IImportService.uploadCsv(storeId, file: Stream)` → `StoredFile` with `purpose = sales_csv`, `status = staged`.
   - `StoredFile` fields: `original_filename`, `mime_type`, `size_bytes`, `checksum_sha256`, `storage_provider`, `storage_key`.
   - `IFileStorage.upload(stream, filename, contentType)` for the binary payload.
   - Validation of extension, MIME type, size ceiling, encoding, and emptiness before accepting.
@@ -355,7 +355,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Mapping is saved per store for reuse.
 - **Functional Specifications:**
   - `ColumnMapping` entity: `name`, `source_type`, `mapping jsonb` (`{ target_field: source_column }`), `is_default`, `created_by`.
-  - `IImportService.suggestMapping(batchId)` â†’ `MappingSuggestion`; `applyMapping(batchId, mappingId)` persists the choice.
+  - `IImportService.suggestMapping(batchId)` → `MappingSuggestion`; `applyMapping(batchId, mappingId)` persists the choice.
   - Header-name heuristic scoring for auto-suggestion; merchant override always wins.
   - One-to-one source/target constraint enforced server-side.
 - **Notes:** Sample values come from the staged rows; keep 3 samples per column.
@@ -363,7 +363,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 ### Task: FR-1.1.3 Row validation and duplicate detection
 - **User Story:** As a merchant, I want invalid rows identified before import so I can fix them.
 - **Acceptance Criteria:**
-  - Validates required values, date parsing (store timezone), integer quantity > 0, numeric amount â‰¥ 0, valid currency, and product consistency.
+  - Validates required values, date parsing (store timezone), integer quantity > 0, numeric amount ≥ 0, valid currency, and product consistency.
   - Duplicate rules are explicit: same `order_id` + `product_id`, or same product/date/quantity/amount when no order ID exists.
   - Duplicates are detected both within the file and against existing records.
   - Errors return row number, field, reason, and raw value.
@@ -371,10 +371,10 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - **Functional Specifications:**
   - `ImportRow` (staged, transient): `import_batch_id`, `row_number`, `raw_data jsonb`, `normalized_data jsonb`, `status` (`valid | invalid | duplicate | imported | skipped`), `issue_count`.
   - `ImportIssue`: `import_batch_id`, `import_row_id`, `row_number`, `field_name`, `issue_code`, `severity`, `message`, `raw_value`.
-  - `IImportService.validate(batchId)` â†’ `ValidationResult`.
+  - `IImportService.validate(batchId)` → `ValidationResult`.
   - `ImportBatch.strict_mode boolean` selects all-or-nothing vs skip-invalid behaviour.
   - Deduplication key: `order_id + product_id` when present, else hash of `product + date + quantity + amount`; compare against `Order.dedupe_hash` and within-file hashes.
-  - Date parsing uses `Store.timezone`; quantity must be integer > 0; amount numeric â‰¥ 0; currency must be a known ISO 4217 code.
+  - Date parsing uses `Store.timezone`; quantity must be integer > 0; amount numeric ≥ 0; currency must be a known ISO 4217 code.
 - **Notes:** Validation must run as a background job for large files; staged rows are purgeable.
 
 ### Task: FR-1.1.4 Preview and error review before commit
@@ -385,8 +385,8 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Nothing is persisted before explicit confirmation.
   - Cancel leaves the database unchanged.
 - **Functional Specifications:**
-  - `IImportService.preview(batchId, limit, offset)` â†’ `PreviewResult` with row samples and counts.
-  - `IImportService.downloadErrorReport(batchId)` â†’ `Stream`; report written to `StoredFile` and linked via `ImportBatch.error_report_file_id`.
+  - `IImportService.preview(batchId, limit, offset)` → `PreviewResult` with row samples and counts.
+  - `IImportService.downloadErrorReport(batchId)` → `Stream`; report written to `StoredFile` and linked via `ImportBatch.error_report_file_id`.
   - `ImportBatch` counts: `total_rows`, `valid_rows`, `invalid_rows`, `duplicate_rows`, `imported_rows`, `skipped_rows`.
   - Cancel sets `ImportBatch.status = cancelled` and deletes staged `ImportRow`/`ImportIssue` rows only.
 - **Notes:** Preview is strictly read-only against domain tables.
@@ -400,7 +400,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Re-uploading the same file warns about duplicates and respects idempotency.
   - The update policy for existing records is explicit; no silent overwrite.
 - **Functional Specifications:**
-  - `IImportService.commit(batchId)` â†’ `ImportSummary`.
+  - `IImportService.commit(batchId)` → `ImportSummary`.
   - Write `Product` (upsert by `external_product_id`/`sku` within store), `Order` (`origin = imported`, `import_batch_id`, `placed_at`, `imported_at`, `dedupe_hash`), and `OrderItem` lines.
   - Rows sharing `external_order_id` group into one `Order` with multiple `OrderItem` rows; rows without order ID create one `Order` each.
   - `ImportBatch.status = completed`, `completed_at` set; `started_at` gives duration.
@@ -425,7 +425,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Disconnect sets `status = revoked`, clears tokens, revokes upstream grant.
 - **Notes:** Depends on decision D1 (platform scope) and D2 (payment-related fields). Read-only scopes only for MVP.
 
-## Module 1.2 â€” Customer Preference and Audience Profiling (P0)
+## Module 1.2 — Customer Preference and Audience Profiling (P0)
 
 ### Task: FR-1.2.1 Product category and niche
 - **User Story:** As a store manager, I want to select my category and niche so recommendations match my business.
@@ -437,7 +437,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - **Functional Specifications:**
   - `Category` entity (global taxonomy): `parent_id`, `name`, `slug`, `is_active`, `sort_order`.
   - `Niche` entity: `category_id`, `store_id` (null = global curated), `name`, `slug`, `is_active`; partial unique on `(store_id, slug)`.
-  - Store profile references selected category/niche IDs; validation requires â‰¥1 category.
+  - Store profile references selected category/niche IDs; validation requires ≥1 category.
   - Custom niche name length limit enforced server-side.
 - **Notes:** Seed the global taxonomy before onboarding is usable.
 
@@ -468,7 +468,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `IAudienceService.submitFeedback(storeId, dto)` and `uploadFeedbackFile(storeId, file)`.
   - `StoredFile.purpose = feedback_file`; type/size/encoding validation mirroring CSV rules.
   - Rejection reasons surfaced per file/field without echoing PII.
-- **Notes:** Feedback text may contain PII â€” document consent and retention handling before launch.
+- **Notes:** Feedback text may contain PII — document consent and retention handling before launch.
 
 ### Task: FR-1.2.4 Save, version, and consume audience profile
 - **User Story:** As a store manager, I want profile updates to apply predictably to future evaluations.
@@ -484,7 +484,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `IAudienceService.getProfileHistory(storeId)` returns all versions.
 - **Notes:** Profiles are immutable once referenced by an evaluation.
 
-## Module 2.1 â€” Proprietary Product Assessment and Scoring (P0)
+## Module 2.1 — Proprietary Product Assessment and Scoring (P0)
 
 ### Task: FR-2.1.1 Create a product concept with validation
 - **User Story:** As a brand owner, I want to enter my product details so the platform can evaluate the concept.
@@ -508,7 +508,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Evaluated concepts cannot be hard-deleted.
   - List is sortable by score, category, and date.
 - **Functional Specifications:**
-  - `ProductConcept.status text` â€” `draft | evaluated | selected | archived`; `deleted_at` soft delete.
+  - `ProductConcept.status text` — `draft | evaluated | selected | archived`; `deleted_at` soft delete.
   - Repository filters for status, category, date range; sort keys `score` (latest evaluation), `category`, `created_at`.
   - Hard delete rejected when an `Evaluation` exists for the concept.
   - `ProductConcept.version int` for optimistic concurrency on edits.
@@ -523,7 +523,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - The system never silently imputes critical missing inputs.
 - **Functional Specifications:**
   - `SufficiencyCheck` entity: `product_concept_id`, `sales_history_status`, `audience_status`, `cost_price_status`, `competitive_data_status`, `overall_status`, `blocking_reasons jsonb`, `checked_at`.
-  - `IEvaluationService.runSufficiencyCheck(conceptId)` â†’ `SufficiencyCheck`.
+  - `IEvaluationService.runSufficiencyCheck(conceptId)` → `SufficiencyCheck`.
   - Each per-input status from `available | missing | stale | insufficient`; staleness window per input type.
   - `blocking_reasons` names the exact missing input; no default substitution.
 - **Notes:** Sales history volume/period thresholds must be documented before build.
@@ -539,10 +539,10 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - **Functional Specifications:**
   - `ScoringModel` entity: `key`, `version`, `name`, `description`, `weights jsonb`, `parameters jsonb`, `is_active`, `effective_from`; unique `(key, version)`.
   - `Evaluation` entity: `scoring_model_id`, `model_version`, `score numeric(7,4)` (null when unavailable), `score_scale`, `confidence`, `is_reliable`, `sufficiency_check_id`, `input_snapshot jsonb`, `evaluated_at`.
-  - `IScoringStrategy.score(concept, inputs, model)` â†’ `EvaluationResult`; rules-based weighted implementation for v1.
+  - `IScoringStrategy.score(concept, inputs, model)` → `EvaluationResult`; rules-based weighted implementation for v1.
   - `IEvaluationService.evaluate(conceptId, modelId?)` and `batchEvaluate(storeId, conceptIds)` (runs as an async job).
-  - Determinism guaranteed: same `input_snapshot` + model version â†’ identical score.
-- **Notes:** Decision D6 â€” rules-based v1 for explainability and reproducibility.
+  - Determinism guaranteed: same `input_snapshot` + model version → identical score.
+- **Notes:** Decision D6 — rules-based v1 for explainability and reproducibility.
 
 ### Task: FR-2.1.5 Score explanation and limitations
 - **User Story:** As a brand owner, I want to understand what drives a score so I can judge its reliability.
@@ -566,12 +566,12 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Merchant can select one or more concepts to advance to Stage 2.
   - Selection is recorded and visible in the concept state.
 - **Functional Specifications:**
-  - `IEvaluationService.compare(conceptIds)` â†’ `ComparisonResult` with score, confidence, key factors per concept.
+  - `IEvaluationService.compare(conceptIds)` → `ComparisonResult` with score, confidence, key factors per concept.
   - `ProductConcept.status` transition to `selected`, recorded with actor and timestamp via audit.
   - Filter/sort API on the concept list endpoint.
 - **Notes:** Selection is the handoff into Stage 2 (landing page / campaign setup).
 
-## Module 2.2 â€” Automated Product Recommendation Engine (P0)
+## Module 2.2 — Automated Product Recommendation Engine (P0)
 
 ### Task: FR-2.2.1 Generate recommendations
 - **User Story:** As a merchant, I want product ideas based on my niche and audience so I can find expansion opportunities.
@@ -581,7 +581,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Deduplicates against existing concepts and previously dismissed ideas.
   - Generation metadata (inputs, model version, timestamp) is stored.
 - **Functional Specifications:**
-  - `IRecommendationService.generate(storeId, requestedBy, count)` â†’ `GenerationRun`; runs as async job (`job_type = recommendation_generation`).
+  - `IRecommendationService.generate(storeId, requestedBy, count)` → `GenerationRun`; runs as async job (`job_type = recommendation_generation`).
   - `GenerationRun` entity: `requested_by`, `model_version`, `input_snapshot jsonb`, `requested_count`, `returned_count`, `status`, `error_message`, timings.
   - `ProductIdea` entity: `generation_run_id`, `name`, `description`, `category_id`, `niche_id`, `rationale`, `state`, `dismissed_reason`, `converted_concept_id`, `model_version`.
   - Deduplication: fuzzy/normalized name+description match against `ProductConcept` and dismissed `ProductIdea`.
@@ -601,7 +601,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - `CHECK (evidence_type = 'verified' requires source_url)` at database level.
   - Staleness flag when `source_published_at` exceeds the configured freshness window.
   - UI renders verified vs hypothesis with distinct treatment; no link rendered without a stored source.
-- **Notes:** No fabricated sources â€” the UI must never synthesize a link from model output.
+- **Notes:** No fabricated sources — the UI must never synthesize a link from model output.
 
 ### Task: FR-2.2.3 Save or dismiss ideas
 - **User Story:** As a merchant, I want to save or dismiss ideas so my library stays relevant.
@@ -610,7 +610,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Dismissed ideas are not re-suggested unless restored.
   - State persists per store and per user.
 - **Functional Specifications:**
-  - `ProductIdea.state text` â€” `new | saved | dismissed | converted`; `dismissed_reason` optional.
+  - `ProductIdea.state text` — `new | saved | dismissed | converted`; `dismissed_reason` optional.
   - `IRecommendationService.save(ideaId)` and `.dismiss(ideaId, reason?)`.
   - Dismissed ideas excluded from generation dedup candidates until explicitly restored.
 - **Notes:** Dismissal is per store (MVP is one store per user), with user attribution retained in audit.
@@ -623,13 +623,13 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Merchant must confirm conversion.
   - Converted concept enters the FR-2.1 evaluation flow.
 - **Functional Specifications:**
-  - `IRecommendationService.convertToConcept(ideaId)` â†’ `ProductConcept` with `source_idea_id` set and `status = draft`.
-  - Pre-fill from `ProductIdea` (name, description, category, niche) â€” price/cost remain merchant inputs.
+  - `IRecommendationService.convertToConcept(ideaId)` → `ProductConcept` with `source_idea_id` set and `status = draft`.
+  - Pre-fill from `ProductIdea` (name, description, category, niche) — price/cost remain merchant inputs.
   - Update `ProductIdea.state = converted` and set `converted_concept_id` in the same transaction.
   - Confirmation step in the UI before persisting.
-- **Notes:** Traceability both directions (`ProductConcept.source_idea_id` â†” `ProductIdea.converted_concept_id`).
+- **Notes:** Traceability both directions (`ProductConcept.source_idea_id` ↔ `ProductIdea.converted_concept_id`).
 
-## Module 3.1 â€” Automated Micro-Landing Page Builder (P0)
+## Module 3.1 — Automated Micro-Landing Page Builder (P0)
 
 ### Task: FR-3.1.1 Product input and page options
 - **User Story:** As an e-commerce seller, I want to enter product details and options so a page can be generated.
@@ -659,7 +659,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Generated output written as a new `PageVersion` with `generated_by = ai` and `model_version` set.
   - Responsive rendering at mobile and desktop breakpoints from the template schema.
   - Failure path stores `AsyncJob.error_code` / `error_message` and offers a safe retry.
-- **Notes:** Performance budget: P95 â‰¤ 5 minutes for generation.
+- **Notes:** Performance budget: P95 ≤ 5 minutes for generation.
 
 ### Task: FR-3.1.3 Product copy generation and editing
 - **User Story:** As an e-commerce seller, I want copy in my market's language so the page fits my audience.
@@ -669,7 +669,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Generated copy avoids unverifiable medical, absolute, or guaranteed claims.
   - Edits persist in the draft.
 - **Functional Specifications:**
-  - `ILandingPageService.generateCopy(pageId)` â†’ `CopySuggestion`, applied to the current draft `PageVersion`.
+  - `ILandingPageService.generateCopy(pageId)` → `CopySuggestion`, applied to the current draft `PageVersion`.
   - Language selection from the `Language` reference table, including `direction` (`ltr | rtl`); RTL layout applied when direction is `rtl`.
   - Claim filter rejecting medical, absolute, and guaranteed-outcome phrasing before the copy is stored.
   - Merchant edits stored in `PageVersion.content jsonb` and persisted in the draft.
@@ -707,20 +707,20 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Accessibility baseline: alt text present on images, labels on form fields, contrast check on the template palette.
 - **Notes:** WCAG 2.1 AA baseline for generated pages; accessibility check must run pre-publish.
 
-## Module 3.2 â€” Dynamic Social Ad Creative and Campaign Setup (P0)
+## Module 3.2 — Dynamic Social Ad Creative and Campaign Setup (P0)
 
 ### Task: FR-3.2.1 Generate ad copy variations
 - **User Story:** As a digital marketer, I want multiple ad copy variations so I can test different messages.
 - **Acceptance Criteria:**
-  - Generates a configurable number of distinct variations (default 3â€“5) from product and landing-page data.
+  - Generates a configurable number of distinct variations (default 3–5) from product and landing-page data.
   - Respects platform character limits and the campaign language.
   - Each variation is linked to the correct product.
   - Near-duplicate variations are flagged.
 - **Functional Specifications:**
-  - `ICampaignService.generateVariations(dto)` â†’ `List<AdVariation>`.
+  - `ICampaignService.generateVariations(dto)` → `List<AdVariation>`.
   - `AdVariation` entity: `adset_id`, `name`, `copy_text`, `headline`, `description`, `creative_file_id`, `primary_creative_id`, `post_id`, `destination_url`, `status = draft`.
   - Platform character-limit table per provider and field; generation truncates/validates against it.
-  - Near-duplicate detection by normalized text similarity â†’ flagged for review.
+  - Near-duplicate detection by normalized text similarity → flagged for review.
   - Variations inherit the campaign language and link to the ad set's product/page.
 - **Notes:** Copy generation reuses the same claim filter as landing-page copy.
 
@@ -732,7 +732,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Only approved variations are eligible for publication.
   - At least one approved variation is required to proceed.
 - **Functional Specifications:**
-  - `AdVariation.status text` â€” `draft | approved | discarded | submitted | active | paused | rejected | failed`; `rejection_reason` for platform rejections.
+  - `AdVariation.status text` — `draft | approved | discarded | submitted | active | paused | rejected | failed`; `rejection_reason` for platform rejections.
   - `ICampaignService.updateAdVariation(id, updates)`, `.approveVariation(id)`, `.discardVariation(id)`.
   - Publication eligibility filter: `status = approved`.
   - Pre-flight blocks submission when the approved count is zero.
@@ -761,7 +761,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Missing or invalid tracking parameters block publication.
 - **Functional Specifications:**
   - `TrackingLink` entity: `test_id`, `campaign_id`, `adset_id`, `ad_variation_id`, `landing_page_id` XOR `post_id`, `token` (unique), `utm_source/medium/campaign/content/term`, `destination_url`.
-  - `ICampaignService.generateTrackingLink(dto)` â†’ `TrackingLink`.
+  - `ICampaignService.generateTrackingLink(dto)` → `TrackingLink`.
   - `AdVariation.destination_url` populated with the generated tracking URL.
   - Publication blocked when `destination_url` is missing or lacks valid tracking parameters.
 - **Notes:** `AdVariation` CHECK requires `post_id` or `destination_url`.
@@ -773,8 +773,8 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Ad preview is displayed.
   - Submission is blocked with a specific list of unresolved items.
 - **Functional Specifications:**
-  - `ICampaignService.validate(campaignId)` â†’ `ValidationResult` with an itemised unresolved list.
-  - Checks: `AdAccountConnection.status = connected` and token not expired, â‰¥1 approved `AdVariation`, budget within minimum, `LandingPage.status = published`, `TrackingLink` present and valid.
+  - `ICampaignService.validate(campaignId)` → `ValidationResult` with an itemised unresolved list.
+  - Checks: `AdAccountConnection.status = connected` and token not expired, ≥1 approved `AdVariation`, budget within minimum, `LandingPage.status = published`, `TrackingLink` present and valid.
   - Ad preview renders copy, creative, and destination URL for each approved variation.
 - **Notes:** The same validation list is shown pre-publish and pre-submit.
 
@@ -787,7 +787,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Expired or revoked authorization is surfaced before submission.
 - **Functional Specifications:**
   - `AdAccountConnection` entity: `provider`, `external_account_id`, `account_name`, `status`, `scopes text[]`, `access_token_encrypted`, `refresh_token_encrypted`, `token_expires_at`, `last_synced_at`, `metadata`; unique `(store_id, provider, external_account_id)`.
-  - `ICampaignService.authorizeAccount(storeId, provider)` â†’ `AuthUrl`; `.completeAccountAuth(storeId, provider, code, state)` â†’ `AdAccountConnection`.
+  - `ICampaignService.authorizeAccount(storeId, provider)` → `AuthUrl`; `.completeAccountAuth(storeId, provider, code, state)` → `AdAccountConnection`.
   - `IAdPlatformClient.refreshToken(creds)` for token renewal; encryption at rest for all token fields.
   - Disconnect sets `status = revoked` and stops sync; expired/revoked states surface in pre-flight.
 - **Notes:** Decision D1 sets the platform set for MVP; implement the interface so more platforms can be added without changes.
@@ -801,15 +801,15 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Platform API errors are mapped to actionable messages.
   - Retry does not create duplicate campaigns.
 - **Functional Specifications:**
-  - `ICampaignService.publish(campaignId, approvedBy)` â†’ `PublicationAttempt`.
+  - `ICampaignService.publish(campaignId, approvedBy)` → `PublicationAttempt`.
   - `PublicationAttempt` entity: `campaign_id` XOR `adset_id` XOR `ad_variation_id`, `provider`, `attempt_number`, `status`, `external_id`, redacted `request_payload`, `response_payload`, `error_code`, `error_message`, `submitted_by`, `submitted_at`.
-  - `IAdPlatformClient.publishCampaign/publishAdSet/publishAd(req)` â†’ `PublishResult`.
+  - `IAdPlatformClient.publishCampaign/publishAdSet/publishAd(req)` → `PublishResult`.
   - `Campaign.external_campaign_id` / `AdSet.external_adset_id` / `AdVariation.external_ad_id` written on success.
   - Idempotency key per campaign publish; retry reuses the existing attempt.
-  - Platform error mapping table â†’ actionable merchant-facing messages; raw payloads stored redacted.
+  - Platform error mapping table → actionable merchant-facing messages; raw payloads stored redacted.
 - **Notes:** Explicit merchant approval (Owner/Manager) required per FR-0.2.
 
-## Module 4.1 â€” Behavioral Tracking and Regional Conversion Intent (P0)
+## Module 4.1 — Behavioral Tracking and Regional Conversion Intent (P0)
 
 ### Task: FR-4.1.1 Event model and ingestion
 - **User Story:** As a merchant, I want consistent event tracking so I can compare intent signals reliably.
@@ -821,10 +821,10 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - **Functional Specifications:**
   - `Event` entity (append-only): `event_id` (client-generated, unique), `tracking_session_id`, `test_id`, `product_id`, `campaign_id`, `adset_id`, `ad_variation_id`, `event_type`, `source` (`web | server`), `url`, `referrer`, `occurred_at`, `received_at`, `is_bot`, `properties jsonb`.
   - `ITrackingService.recordEvent(storeId, dto)`; event type must exist in the `EventType` reference table.
-  - Idempotency via unique `event_id` â€” duplicate inserts ignored, not errors.
+  - Idempotency via unique `event_id` — duplicate inserts ignored, not errors.
   - Invalid events rejected with a logged reason (no stack trace, no PII).
   - Indexes on `(store_id, event_type, occurred_at)` and `tracking_session_id`.
-- **Notes:** `Event` and `Order` and `MetricSnapshot` are the high-volume tables â€” partition by month when volume grows.
+- **Notes:** `Event` and `Order` and `MetricSnapshot` are the high-volume tables — partition by month when volume grows.
 
 ### Task: FR-4.1.2 Landing-page visit and interaction tracking
 - **User Story:** As a merchant, I want page visits and interactions recorded so I can measure funnel entry.
@@ -850,11 +850,11 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Duplicate clicks within a session window are deduplicated.
   - A WhatsApp click is never counted as a purchase or confirmed order.
 - **Functional Specifications:**
-  - `ITrackingService.trackWhatsAppClick(sessionId, dto)` â†’ `RedirectResult`; endpoint resolves `TrackingLink.token`, records a `whatsapp_click` event, then 302s to `wa.me`.
+  - `ITrackingService.trackWhatsAppClick(sessionId, dto)` → `RedirectResult`; endpoint resolves `TrackingLink.token`, records a `whatsapp_click` event, then 302s to `wa.me`.
   - Association uses the tracking link's campaign/adset/ad variation and the session's product/test.
   - Deduplication window per session + product (configurable) to avoid double counting.
   - Metric layer enforces: `whatsapp_click` never contributes to confirmed orders or deposits.
-- **Notes:** Intent signal only â€” must be labelled as such in the dashboard.
+- **Notes:** Intent signal only — must be labelled as such in the dashboard.
 
 ### Task: FR-4.1.4 COD order form and submission
 - **User Story:** As a merchant, I want customers to submit COD orders so I can measure purchase intent without online payment.
@@ -866,7 +866,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Valid submissions are stored and linked to product/campaign where available.
   - Rate limiting and spam protection are applied.
 - **Functional Specifications:**
-  - `ITrackingService.submitCodOrder(storeId, dto)` â†’ `Order` with `origin = cod`, `status = pending`, `test_phase = during_test`.
+  - `ITrackingService.submitCodOrder(storeId, dto)` → `Order` with `origin = cod`, `status = pending`, `test_phase = during_test`.
   - `Order` fields used: `customer_name`, `customer_phone`, `customer_address_enc`, `currency`, `total_minor`, `landing_page_id`, `post_id`, `campaign_id`, `tracking_session_id`, `dedupe_hash`.
   - `OrderItem` line with `quantity > 0`, `unit_price_minor`, `line_total_minor`, `product_name_snapshot`.
   - Field-level validation errors keyed to the form field; market-specific phone and address rules.
@@ -899,11 +899,11 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - The dashboard displays attribution coverage percentage.
 - **Functional Specifications:**
   - `Attribution` entity: `subject_type` (`event | order`), `subject_id`, `test_id`, `campaign_id`, `adset_id`, `ad_variation_id`, `model` (`last_touch | first_touch | direct`), `window_seconds`, `is_attributed`, `confidence`, `resolved_at`; unique `(subject_type, subject_id)`.
-  - `IAttributionStrategy.resolve(subjectType, subjectId, context)` â†’ `Attribution`; implementations for `last_touch`, `first_touch`, `direct`.
+  - `IAttributionStrategy.resolve(subjectType, subjectId, context)` → `Attribution`; implementations for `last_touch`, `first_touch`, `direct`.
   - `ITrackingService.resolveAttribution(subjectType, subjectId)` resolves or returns the direct/unknown result.
   - Attribution window configurable per store and versioned with each resolved attribution.
   - Coverage metric: attributed subjects أ· total subjects, shown on the dashboard.
-- **Notes:** Decision D4 â€” no reliable WhatsApp â†’ order identity handoff; use store-scoped token + self-reported order code. Multi-touch deferred.
+- **Notes:** Decision D4 — no reliable WhatsApp → order identity handoff; use store-scoped token + self-reported order code. Multi-touch deferred.
 
 ### Task: FR-4.1.7 Conversion metrics dashboard
 - **User Story:** As a merchant, I want to compare visits, WhatsApp clicks, and orders so I can understand customer response.
@@ -914,14 +914,14 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Data freshness (last update) is visible.
   - No metric is labeled "sale" unless verified by order or payment.
 - **Functional Specifications:**
-  - `ITrackingService.getMetrics(storeId, filters)` â†’ `MetricsResult` grouped by product and campaign.
+  - `ITrackingService.getMetrics(storeId, filters)` → `MetricsResult` grouped by product and campaign.
   - Metric definitions with explicit numerator, denominator, and formula text shipped with the response.
   - Date range + store timezone filters; all timestamps converted for display.
   - Freshness indicator = latest `Event.received_at` / `MetricSnapshot.snapshot_at` in the selected window.
   - Label policy enforced in API and UI: "sale" only for `Order` with confirmed status or a confirmed `Deposit`.
 - **Notes:** Dashboard query budget P95 < 2 seconds; pre-aggregate when needed.
 
-## Module 5.1 â€” Automated Go / No-Go Demand Verdict (P0)
+## Module 5.1 — Automated Go / No-Go Demand Verdict (P0)
 
 ### Task: FR-5.1.1 Retrieve test results
 - **User Story:** As a merchant, I want the system to collect all test results so the verdict is based on complete data.
@@ -931,7 +931,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - A data snapshot is stored with the verdict.
   - Timezone and currency are consistent with the campaign.
 - **Functional Specifications:**
-  - `IVerdictService.computeSnapshot(testId, period: DateRange)` â†’ `TestResultSnapshot`.
+  - `IVerdictService.computeSnapshot(testId, period: DateRange)` → `TestResultSnapshot`.
   - `TestResultSnapshot` entity: `test_id`, `period_start`, `period_end`, `currency`, `spend_minor`, `impressions`, `clicks`, `tracked_conversions`, `confirmed_deposits`, `conversion_rate`, `cost_per_conversion_minor`, `data_completeness`, `source_metric_snapshot_ids uuid[]`, `captured_at`.
   - Spend/impressions/clicks sourced from `MetricSnapshot`; conversions from `Event` of the test's primary conversion type.
   - `data_completeness` reflects missing metric sources; partial data recorded explicitly, not silently zero-filled.
@@ -960,7 +960,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - **Functional Specifications:**
   - `DecisionRuleSet` entity: `store_id` (null = platform default), `category_id`, `version`, `is_active`, `min_spend_minor`, `min_clicks`, `min_conversions`, `min_confirmed_deposits`, `min_conversion_rate`, `max_cost_per_conversion_minor`, `rules jsonb`, `created_by`.
   - `IVerdictService.upsertDecisionRuleSet(storeId, dto)`; each save creates a new version and deactivates the prior one.
-  - Resolution order: campaign/category rule set â†’ store rule set â†’ platform default.
+  - Resolution order: campaign/category rule set → store rule set → platform default.
   - Rule changes audited via `IAuditService` (before/after).
   - Active rule set displayed with the verdict (key, version, thresholds).
 - **Notes:** `rules jsonb` requires a `schema_version` key.
@@ -973,10 +973,10 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Go/No-Go cannot be returned when data sufficiency fails.
   - Verdict stores inputs, rule version, and timestamp.
 - **Functional Specifications:**
-  - `IVerdictService.evaluateVerdict(testId)` â†’ `Verdict`.
-  - `IVerdictEvaluator.evaluate(snapshot, ruleSet)` â†’ `VerdictResult`; deterministic rule evaluation, no randomness.
+  - `IVerdictService.evaluateVerdict(testId)` → `Verdict`.
+  - `IVerdictEvaluator.evaluate(snapshot, ruleSet)` → `VerdictResult`; deterministic rule evaluation, no randomness.
   - `Verdict` entity: `test_id`, `result_snapshot_id`, `decision_rule_set_id`, `outcome` (`go | no_go | extend_test`), `is_conclusive`, `primary_reason`, `limitations jsonb`, `rule_trace jsonb`.
-  - Sufficiency gate: if `snapshot.data_completeness` or the rule minimums are unmet â†’ outcome forced to `extend_test`.
+  - Sufficiency gate: if `snapshot.data_completeness` or the rule minimums are unmet → outcome forced to `extend_test`.
   - `Test.status` transitions to `awaiting_verdict` / `completed` / `extended` accordingly.
 - **Notes:** `rule_trace` records every rule evaluated, its threshold, observed value, and pass/fail.
 
@@ -1015,7 +1015,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Verdict is recomputed under a documented policy (combined or new-window data).
   - Prior verdict and data snapshot remain in history.
 - **Functional Specifications:**
-  - `IVerdictService.extendTest(testId, dto)` â†’ `TestExtension`.
+  - `IVerdictService.extendTest(testId, dto)` → `TestExtension`.
   - `TestExtension` entity: `test_id`, `previous_end_at`, `new_end_at`, `added_budget_minor`, `currency`, `reason`, `approved_by`.
   - Budget validation against `BudgetPolicy` total/daily caps and `Test.total_budget_minor`; over-cap requests rejected.
   - `Test.status = extended`, `planned_end_at` / `total_budget_minor` updated; actuals untouched.
@@ -1023,7 +1023,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Prior `Verdict` and `TestResultSnapshot` rows are never modified or deleted.
 - **Notes:** Extension requires Owner/Manager approval per FR-0.2.
 
-## Module 5.2 â€” Predictive Batch Quantity and Investment Recommendation (P0)
+## Module 5.2 — Predictive Batch Quantity and Investment Recommendation (P0)
 
 ### Task: FR-5.2.1 Collect investment inputs
 - **User Story:** As a store owner, I want to enter costs and budget so recommendations reflect my constraints.
@@ -1035,7 +1035,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - **Functional Specifications:**
   - `InvestmentProfile` entity: `test_id`, `version`, `unit_cost_minor`, `selling_price_minor`, `fulfillment_cost_minor`, `payment_fee_bp`, `available_budget_minor`, `target_margin_bp`, `supplier_moq`, `lead_time_days`, `currency`, `is_current`, `created_by`; unique `(test_id, version)`.
   - `IInvestmentService.upsertProfile(testId, dto)`; each save creates a new version and demotes the prior current row.
-  - Validation: non-negative amounts, `payment_fee_bp` and `target_margin_bp` within 0â€“10000, `supplier_moq >= 1`, `lead_time_days >= 0`, single currency across all inputs.
+  - Validation: non-negative amounts, `payment_fee_bp` and `target_margin_bp` within 0–10000, `supplier_moq >= 1`, `lead_time_days >= 0`, single currency across all inputs.
   - Missing inputs returned as an explicit list of missing fields; no default substitution.
 - **Notes:** `Money` value object enforces minor units and currency consistency.
 
@@ -1047,24 +1047,24 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Confidence and limitations are displayed.
   - No single-point certainty is presented.
 - **Functional Specifications:**
-  - `IDemandEstimator.estimate(snapshot: TestResultSnapshot, profile: InvestmentProfile)` â†’ `DemandEstimate`.
+  - `IDemandEstimator.estimate(snapshot: TestResultSnapshot, profile: InvestmentProfile)` → `DemandEstimate`.
   - `DemandEstimate` entity: `investment_recommendation_id`, `low_units`, `base_units`, `high_units`, `assumptions jsonb`, `confidence` (`high | medium | low`).
-  - Assumptions stored explicitly: traffic source, repeat rate, seasonality factor, attribution adjustment factor â€” each with a value and source.
+  - Assumptions stored explicitly: traffic source, repeat rate, seasonality factor, attribution adjustment factor — each with a value and source.
   - Confidence derived from snapshot data completeness and sample size; limitations attached to the recommendation.
   - Always rendered as a range; no single-point output.
-- **Notes:** `assumptions jsonb` requires a `schema_version` key; range ordering enforced low â‰¤ base â‰¤ high.
+- **Notes:** `assumptions jsonb` requires a `schema_version` key; range ordering enforced low ≤ base ≤ high.
 
 ### Task: FR-5.2.3 Unit economics
 - **User Story:** As a store owner, I want unit economics so I can judge profitability before ordering.
 - **Acceptance Criteria:**
-  - Computes contribution margin per unit (price âˆ’ COGS âˆ’ fulfillment âˆ’ fees).
+  - Computes contribution margin per unit (price − COGS − fulfillment − fees).
   - Computes break-even units and CAC from test spend and conversions.
   - Formulas are displayed.
   - Negative-margin scenarios are clearly flagged.
 - **Functional Specifications:**
-  - `IInvestmentCalculator.calculateEconomics(profile, demand)` â†’ `UnitEconomics`.
+  - `IInvestmentCalculator.calculateEconomics(profile, demand)` → `UnitEconomics`.
   - `UnitEconomics` entity: `investment_recommendation_id`, `contribution_margin_minor`, `break_even_units numeric(12,2)`, `cac_minor`, `formulas jsonb`, `is_negative_margin`.
-  - `contribution_margin_minor = selling_price_minor âˆ’ unit_cost_minor âˆ’ fulfillment_cost_minor âˆ’ (selling_price_minor أ— payment_fee_bp / 10000)`.
+  - `contribution_margin_minor = selling_price_minor − unit_cost_minor − fulfillment_cost_minor − (selling_price_minor أ— payment_fee_bp / 10000)`.
   - `break_even_units = available_budget_minor / contribution_margin_minor` (undefined for a negative margin).
   - `cac_minor = spend_minor / tracked_conversions` from the test snapshot.
   - `formulas jsonb` stores the rendered formula text for display.
@@ -1078,7 +1078,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Infeasible scenarios are excluded with an explanation.
   - If no scenario is feasible, the system explains why instead of returning a number.
 - **Functional Specifications:**
-  - `IInvestmentCalculator.generateScenarios(profile, demand, economics)` â†’ `List<QuantityScenario>`.
+  - `IInvestmentCalculator.generateScenarios(profile, demand, economics)` → `List<QuantityScenario>`.
   - `QuantityScenario` entity: `investment_recommendation_id`, `label` (`conservative | base | aggressive`), `quantity`, `inventory_cost_minor`, `expected_units_sold_low/high`, `revenue_low/high_minor`, `profit_low/high_minor`, `sell_through_low/high`, `overstock_risk`, `stockout_risk`, `is_feasible`, `infeasibility_reason`.
   - Constraints applied: `quantity >= supplier_moq`, `quantity أ— unit_cost_minor <= available_budget_minor`, quantity aligned to the demand range.
   - Scenario quantities derived from the demand range (low / base / high).
@@ -1093,7 +1093,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Estimates are labeled as projections, not guarantees.
   - Assumptions are listed for each scenario.
 - **Functional Specifications:**
-  - Scenario card UI renders: inventory cost, expected units sold (lowâ€“high), revenue range, profit range, sell-through %, overstock risk, stockout risk.
+  - Scenario card UI renders: inventory cost, expected units sold (low–high), revenue range, profit range, sell-through %, overstock risk, stockout risk.
   - Risk computed from `expected_units_sold_low` vs `quantity` (overstock) and `expected_units_sold_high` vs `quantity` (stockout), labelled `low | medium | high`.
   - "Projection" labeling on all estimated figures; no guarantee wording.
   - Assumptions rendered from `DemandEstimate.assumptions` plus per-scenario notes.
@@ -1107,14 +1107,14 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Original and revised assumptions are visually distinguishable.
   - Version history is retained and recommendations update accordingly.
 - **Functional Specifications:**
-  - `IInvestmentService.recalculate(testId, profileId, overrides)` â†’ `InvestmentRecommendation`.
+  - `IInvestmentService.recalculate(testId, profileId, overrides)` → `InvestmentRecommendation`.
   - `InvestmentRecommendation` entity: `test_id`, `investment_profile_id`, `version`, `summary`, `assumptions_snapshot jsonb`, `is_current`, `created_by`; unique `(test_id, version)`.
   - Recalculation creates a new `InvestmentRecommendation` plus fresh `DemandEstimate`, `UnitEconomics`, and `QuantityScenario` rows; the prior version is retained and demoted to `is_current = false`.
   - Diff view compares `assumptions_snapshot` of the prior and current versions, highlighting changed fields.
   - `IInvestmentService.getHistory(testId)` lists all recommendation versions; `getRecommendation(testId)` returns the current one.
 - **Notes:** Prior recommendation versions are never mutated.
 
-## Module 4.2 â€” Optimization (MVP cut: recommendations only)
+## Module 4.2 — Optimization (MVP cut: recommendations only)
 
 ### Task: FR-4.2.5 Optimization recommendations (MVP, recommend-only)
 - **User Story:** As a merchant, I want recommended actions I can approve so optimization stays under my control.
@@ -1126,24 +1126,24 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - **Functional Specifications:**
   - `OptimizationRecommendation` entity: `finding_id`, `campaign_id`, `adset_id`, `ad_variation_id`, `action` (`pause | keep | reallocate | increase_budget | decrease_budget`), `rationale`, `proposed_changes jsonb`, `expected_impact jsonb`, `budget_impact_minor`, `currency`, `status` (`pending | accepted | dismissed | executed | expired`).
   - `IOptimizationService.getRecommendations(campaignId, status?)`, `.acceptRecommendation(id, actorId)`, `.dismissRecommendation(id, actorId)`.
-  - Accepting records merchant intent only â€” no platform write is performed in MVP.
+  - Accepting records merchant intent only — no platform write is performed in MVP.
   - `BudgetPolicy` caps enforced when generating the proposal: no recommendation may exceed the total or daily cap.
   - Acceptance/dismissal audited with actor and before/after status.
 - **Notes:** Deferred from MVP: FR-4.2.6 automated execution, FR-4.2.7 kill switch execution paths. `OptimizationAction` and `BudgetPolicy` entities exist for Phase 2.
 
 ## Cross-Cutting Acceptance Criteria (apply to every task)
 
-- **CC-1** â€” Authorization is enforced server-side on every endpoint.
-- **CC-2** â€” Validation exists on both client and server; errors are specific and actionable.
-- **CC-3** â€” No stack traces, secrets, or unnecessary PII appear in user-facing errors or logs.
-- **CC-4** â€” Timestamps are stored in UTC and displayed in the store timezone; money is stored in minor units with currency.
-- **CC-5** â€” Merchant-facing UI and generated pages support required languages and RTL layouts.
-- **CC-6** â€” Generated landing pages meet a WCAG 2.1 AA baseline.
-- **CC-7** â€” PII is minimized, encrypted at rest/in transit, and collected only with required consent.
-- **CC-8** â€” External calls use rate limiting, retries with backoff, timeouts, and idempotency.
-- **CC-9** â€” Structured logs, metrics, and job IDs exist for all async workflows.
-- **CC-10** â€” Performance budgets: page generation P95 â‰¤ 5 minutes; dashboard queries P95 < 2 seconds.
-- **CC-11** â€” Test coverage includes unit, integration, tenant-isolation, and end-to-end tests for critical flows.
+- **CC-1** — Authorization is enforced server-side on every endpoint.
+- **CC-2** — Validation exists on both client and server; errors are specific and actionable.
+- **CC-3** — No stack traces, secrets, or unnecessary PII appear in user-facing errors or logs.
+- **CC-4** — Timestamps are stored in UTC and displayed in the store timezone; money is stored in minor units with currency.
+- **CC-5** — Merchant-facing UI and generated pages support required languages and RTL layouts.
+- **CC-6** — Generated landing pages meet a WCAG 2.1 AA baseline.
+- **CC-7** — PII is minimized, encrypted at rest/in transit, and collected only with required consent.
+- **CC-8** — External calls use rate limiting, retries with backoff, timeouts, and idempotency.
+- **CC-9** — Structured logs, metrics, and job IDs exist for all async workflows.
+- **CC-10** — Performance budgets: page generation P95 ≤ 5 minutes; dashboard queries P95 < 2 seconds.
+- **CC-11** — Test coverage includes unit, integration, tenant-isolation, and end-to-end tests for critical flows.
 
 ## Open Decisions (must be resolved before the dependent task starts)
 
@@ -1152,26 +1152,26 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 | D1 | Which ad platforms for MVP (Meta only vs Meta+TikTok+Google) | FR-1.1.6, FR-3.2.x |
 | D2 | Deposit verification: manual admin vs payment gateway | FR-4.1.5 |
 | D3 | Competitive/market data source: licensed API vs public data vs LLM knowledge | FR-2.2.x |
-| D4 | Attribution model for WhatsApp â†’ order | FR-4.1.6 |
-| D5 | Auto-optimization in MVP â€” recommend-only is the chosen default | FR-4.2.5 |
+| D4 | Attribution model for WhatsApp → order | FR-4.1.6 |
+| D5 | Auto-optimization in MVP — recommend-only is the chosen default | FR-4.2.5 |
 | D6 | Scoring approach: rules-based weighted (chosen for v1) vs ML | FR-2.1.4 |
-| D7 | Multi-store per merchant â€” MVP is 1 store per user via `Store.owner_user_id` | FR-0.2, FR-0.1 |
+| D7 | Multi-store per merchant — MVP is 1 store per user via `Store.owner_user_id` | FR-0.2, FR-0.1 |
 | D8 | Markets, currencies, RTL languages in v1 | FR-3.1.x, FR-4.1.4 |
 
 ## Suggested Delivery Slices
 
 | Slice | Contents | Depends on |
 |---|---|---|
-| **0 â€” Database schema (blocking)** | DB-0.1â€“DB-0.24 (schema, integrity, indexes, RLS, concurrency, PII, roles, CI, performance, retention, docs) | â€” |
-| **A â€” Foundation & onboarding** | FR-0.x, FR-1.1.1â€“1.1.5, FR-1.2.x | 0 |
-| **B â€” Concept evaluation** | FR-2.1.x, FR-1.1.6 (integration import) | A (sales + profile data) |
-| **C â€” Recommendations & assets** | FR-2.2.x, FR-3.1.x, FR-3.2.x | B (concepts), D1/D3 |
-| **D â€” Measurement** | FR-4.1.x | C (live pages and campaigns) |
-| **E â€” Decision & investment** | FR-5.1.x, FR-5.2.x | D (test results) |
-| **F â€” Optimization** | FR-4.2.5 only (recommendations) | D + one complete test cycle |
+| **0 — Database schema (blocking)** | DB-0.1–DB-0.24 (schema, integrity, indexes, RLS, concurrency, PII, roles, CI, performance, retention, docs) | — |
+| **A — Foundation & onboarding** | FR-0.x, FR-1.1.1–1.1.5, FR-1.2.x | 0 |
+| **B — Concept evaluation** | FR-2.1.x, FR-1.1.6 (integration import) | A (sales + profile data) |
+| **C — Recommendations & assets** | FR-2.2.x, FR-3.1.x, FR-3.2.x | B (concepts), D1/D3 |
+| **D — Measurement** | FR-4.1.x | C (live pages and campaigns) |
+| **E — Decision & investment** | FR-5.1.x, FR-5.2.x | D (test results) |
+| **F — Optimization** | FR-4.2.5 only (recommendations) | D + one complete test cycle |
 
 **Recommended MVP cut:** 0 + A + B + C + D + E, with FR-4.2.5 recommendations only.
-**Hard rule:** No application module starts before Phase 0 (DB-0.1â€“DB-0.24) is green, with DB-0.21 (CI pipeline) reporting success.
+**Hard rule:** No application module starts before Phase 0 (DB-0.1–DB-0.24) is green, with DB-0.21 (CI pipeline) reporting success.
 
 **Explicitly deferred:** Automated budget reallocation (FR-4.2.6), real-time streaming optimization, multi-touch attribution, payment processing, payment-gateway deposit verification (D2), inventory/warehouse sync, mobile apps, and multi-user collaboration beyond the defined roles.
 
