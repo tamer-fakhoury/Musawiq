@@ -11,9 +11,18 @@ Sources, in authority order:
 4. `docs/Requirements.md` - FR acceptance criteria
 5. `docs/STATUS.md` - current phase gate
 
-**Entry gate.** No Phase 1 task starts until Phase 0 is green through DB-0.24,
-including DB-0.21 (verification pipeline), DB-0.15 (RLS), and DB-0.17
-(concurrency). This document is only a plan; it does not open the gate.
+**Entry gate: Phase 0 is closed.** Phase 1 starts from the accepted 68-table
+schema at revision 18. The closing gates are complete:
+
+- DB-0.13 Gate G2: integrity and foreign-key matrix accepted.
+- DB-0.15 Gate G3: RLS and tenancy policies accepted.
+- DB-0.21 Gate G4: verification pipeline accepted; `verify_all` is green and the
+  schema audit reports 7/7.
+- DB-0.17 concurrency is deferred to Phase 1: optimistic locking is implemented
+  in the application layer using the existing `version` columns. No database
+  migration is pending.
+
+This document is the Phase 1 execution plan.
 
 **MVP cut.** Slices A + B + C + D + E, plus FR-4.2.5 (optimization
 recommendations only). FR-4.2.1-FR-4.2.4 are decomposed for completeness but are
@@ -160,23 +169,26 @@ sequenced after the cut; `Blocked` = implementation waits on an open decision.
 | FR-5.2.5 | Scenario presentation and risk | E | P1-E12 | MVP |
 | FR-5.2.6 | Adjust assumptions and recalculate with versioning | E | P1-E13 | MVP |
 
-**Unmapped FR.** FR-4.2.6 has no atomic task because automated budget
-reallocation is an explicit non-goal for this Phase 1. The entity
-`optimization_actions` and the `optimization_rule_sets` schema remain reserved
-for Phase 2; do not add execution paths in Phase 1.
+## Coverage check
 
-**FR count note.** `docs/Requirements.md` contains 64 FR headings. The stated
-"58 FR items" is the MVP cut: it excludes FR-4.2.1-FR-4.2.4 and
-FR-4.2.6-FR-4.2.7 from Module 4.2. All 64 headings are listed above; 63 are
-mapped and FR-4.2.6 is intentionally unmapped.
+- `docs/Requirements.md` contains **64 FR headings**, from FR-0.1 through
+  FR-5.2.6. The "58 FR items" figure is the MVP cut, not the full FR list; it
+  excludes FR-4.2.1-FR-4.2.4 and FR-4.2.6-FR-4.2.7 from Module 4.2.
+- **Mapped to at least one atomic task: 63.**
+- **Intentionally excluded: 1** - FR-4.2.6 automated execution is an explicit
+  non-goal. It is present in the traceability table with `-` in the task column
+  and no task was invented for it.
+- **Unmapped with no task: 0.** Every other FR-0.x through FR-5.x has at least
+  one task ID.
+- Partial delivery is called out for FR-4.2.7 (guardrails and audit only),
+  FR-4.1.5 (manual deposits only), and FR-4.1.6 (single-touch only).
 
 ## Slice A - Foundation and onboarding
 
 ### P1-A1 Application scaffold and operational baseline
 
 **TASK:** Complete the application scaffold with configuration, database session
-management, structured logging, error envelope, health endpoint, and the test
-harness the rest of Phase 1 uses.
+management, health endpoint, and the test harness the rest of Phase 1 uses.
 
 **ACCEPTANCE CRITERIA:**
 - `GET /health` returns liveness and database-connectivity status without exposing
@@ -185,18 +197,42 @@ harness the rest of Phase 1 uses.
   missing required value; no secret is logged.
 - The database session helper supports read-only and transactional use and is
   reused by repositories.
-- The shared error envelope and correlation-ID middleware are wired into the
-  application.
+- The router wiring accepts the error and correlation middleware delivered by
+  P1-A1b without requiring a second application entrypoint.
 - Unit and integration test fixtures exist; `pytest` passes on a clean checkout
   with the same database URL rules as Phase 0.
 
 **DEPENDS ON:** none (Engineer 2 scaffold is the starting point)
 
 **TOUCHES:** `src/musawiq/main.py`, `src/musawiq/config.py`,
-`src/musawiq/db.py`, `src/musawiq/api/health.py`,
-`src/musawiq/middleware/errors.py`, `tests/`
+`src/musawiq/db.py`, `src/musawiq/api/health.py`, `tests/`
 
 **FR:** FR-0.1 (platform baseline), all cross-cutting criteria
+
+### P1-A1b Error envelope, correlation IDs, and structured logging
+
+**TASK:** Implement the shared error envelope, correlation-ID middleware, and
+structured logging used by every Phase 1 endpoint and job.
+
+**ACCEPTANCE CRITERIA:**
+- Error responses expose a stable code, actionable message, correlation ID, and
+  no stack trace, secret, or unnecessary PII.
+- Correlation IDs are accepted from trusted headers or generated, attached to the
+  request context, returned in the response, and propagated to audit and job
+  records.
+- Structured logs are JSON with timestamp, level, store ID, actor ID,
+  correlation ID, and job ID when present.
+- Unexpected exceptions are converted to the envelope without leaking internals.
+- Unit tests cover header generation/propagation, validation errors, internal
+  errors, and log-field redaction.
+
+**DEPENDS ON:** P1-A1
+
+**TOUCHES:** `src/musawiq/middleware/errors.py`,
+`src/musawiq/middleware/correlation.py`,
+`src/musawiq/middleware/logging.py`, `tests/unit/test_error_envelope.py`
+
+**FR:** FR-0.1, FR-0.3, FR-0.4 (cross-cutting error and traceability rules)
 
 ### P1-A2 Tenant context and store scoping
 
@@ -215,7 +251,7 @@ and the cross-store denial path for every tenant-owned query.
 - Store deletion follows the documented retention/deletion process and cannot
   orphan tenant rows.
 
-**DEPENDS ON:** P1-A1
+**DEPENDS ON:** P1-A1, P1-A1b
 
 **TOUCHES:** `src/musawiq/middleware/tenant.py`,
 `src/musawiq/repositories/base.py`, `src/musawiq/api/deps.py`,
@@ -237,7 +273,7 @@ server-side authorization check used by every privileged use case.
 - Every privileged action records the acting user.
 - Unit tests cover every role-action cell in the matrix.
 
-**DEPENDS ON:** P1-A2
+**DEPENDS ON:** P1-A2, P1-A1b
 
 **TOUCHES:** `src/musawiq/domain/permissions.py`,
 `src/musawiq/services/authorization.py`, `src/musawiq/api/deps.py`,
@@ -262,7 +298,7 @@ read API.
 - PII is excluded or hashed before writing; tests assert no raw IP, token, or
   address is stored.
 
-**DEPENDS ON:** P1-A1, P1-A2, P1-A3
+**DEPENDS ON:** P1-A1, P1-A1b, P1-A2, P1-A3
 
 **TOUCHES:** `src/musawiq/services/audit.py`,
 `src/musawiq/repositories/audit_logs.py`, `src/musawiq/api/audit.py`,
@@ -286,7 +322,7 @@ correlation IDs, retry/backoff, and progress reporting.
   ID; a safe manual retry path exists.
 - Tests cover duplicate enqueue, worker crash recovery, retry, and cancellation.
 
-**DEPENDS ON:** P1-A1, P1-A3
+**DEPENDS ON:** P1-A1, P1-A1b, P1-A3
 
 **TOUCHES:** `src/musawiq/domain/jobs.py`, `src/musawiq/services/jobs.py`,
 `src/musawiq/workers/runner.py`, `src/musawiq/repositories/async_jobs.py`,
@@ -565,27 +601,37 @@ timestamping, store linkage, and PII-conscious rejection messages.
 
 **FR:** FR-1.2.3
 
-### Slice A ordered first wave
+## Wave A execution order
 
-The sequence below is dependency-correct. Tasks at the same rank may run in
-parallel if the named dependencies are complete.
+The first eight tasks, in dependency order. `P1-A1` is split so the application
+scaffold and the cross-cutting middleware can proceed in parallel.
 
-1. `P1-A1` - scaffold and health (Engineer 2's current work)
-2. `P1-A2` - tenant context and scoping
-3. `P1-A3` - role matrix and authorization
-4. `P1-A4` - audit service
-5. `P1-A5` - async jobs and idempotency
-6. `P1-A6` - AI governance and degraded mode
-7. `P1-A7` - file storage and upload validation
-8. `P1-A8` - CSV upload and staged batch
-9. `P1-A9` - column mapping
-10. `P1-A10` - row validation and dedupe
-11. `P1-A11` - preview and error report
-12. `P1-A12` - commit, summary, and history
-13. `P1-A13` - taxonomy selection (may start after A3 in parallel with A5-A7)
-14. `P1-A14` - audience profiles and segments
-15. `P1-A15` - profile versioning
-16. `P1-A16` - feedback intake (may start after A7/A14)
+| # | Task | Owner | Scope | Depends on |
+|---|---|---|---|---|
+| 1 | `P1-A1` | E2 | Scaffold, config, database session, `/health`, test fixtures (`src/musawiq/main.py`, `config.py`, `db.py`, `api/health.py`) | none |
+| 2 | `P1-A1b` | E1 | Error envelope, correlation IDs, structured logging (`src/musawiq/middleware/errors.py`, `correlation.py`, `logging.py`) | P1-A1 |
+| 3 | `P1-A2` | E2 | Tenant context and repository store scoping (`src/musawiq/middleware/tenant.py`, `repositories/base.py`, `api/deps.py`) | P1-A1, P1-A1b |
+| 4 | `P1-A3` | E1 | Permission matrix and authorization (`src/musawiq/auth/`, `src/musawiq/middleware/`) | P1-A2, P1-A1b |
+| 5 | `P1-A4` | E1 | Audit service and query surface (`src/musawiq/services/audit.py`, `repositories/audit_logs.py`, `api/audit.py`) | P1-A1, P1-A1b, P1-A2, P1-A3 |
+| 6 | `P1-A5` | E2 | Async jobs, idempotency, correlation propagation (`src/musawiq/workers/`, `services/jobs.py`, `repositories/async_jobs.py`) | P1-A1, P1-A1b, P1-A3 |
+| 7 | `P1-A6` | E2 | AI governance and degraded mode (`src/musawiq/services/ai_governance.py`, `integrations/ai/`) | P1-A1, P1-A4 |
+| 8 | `P1-A7` | E2 | File storage and upload validation (`src/musawiq/integrations/storage/`, `services/files.py`, `api/files.py`) | P1-A1, P1-A2, P1-A4 |
+
+E3 owns documentation and test-harness tasks only; these are pulled when a Wave
+A task needs contract documentation or shared test fixtures. E3 does not take an
+application feature task.
+
+Remaining Slice A sequence after Wave A:
+
+9. `P1-A8` - CSV upload and staged batch
+10. `P1-A9` - column mapping
+11. `P1-A10` - row validation and dedupe
+12. `P1-A11` - preview and error report
+13. `P1-A12` - commit, summary, and history
+14. `P1-A13` - taxonomy selection (may run in parallel with A5-A8)
+15. `P1-A14` - audience profiles and segments
+16. `P1-A15` - profile versioning
+17. `P1-A16` - feedback intake (may run after A7/A14)
 
 ## Slice B - Concept evaluation
 
@@ -1986,7 +2032,8 @@ invented here; where the requirements already settle a decision, that is noted.
 
 ## Cross-slice sequencing notes
 
-Slice A is the ordered first wave above. After A is green, the safe order is:
+Wave A is the ordered first wave above; the remaining Slice A sequence follows
+it. After A is green, the safe order is:
 
 - **B:** B1 -> B2 -> B3 -> B4 -> B5 -> B6 -> B7. B8/B9 may run in parallel once
   D1 is decided.
@@ -2003,19 +2050,20 @@ Slice A is the ordered first wave above. After A is green, the safe order is:
 
 | Slice | Tasks | Notes |
 |---|---|---|
-| A - Foundation and onboarding | 16 | includes platform foundations and import/audience onboarding |
+| A - Foundation and onboarding | 17 | includes the A1/A1b scaffold split |
 | B - Concept evaluation | 9 | includes integration import, blocked by D1 |
 | C - Recommendations and assets | 18 | includes the spec-derived Test lifecycle |
 | D - Measurement | 8 | includes tracking, COD, deposits, attribution, dashboard |
 | E - Decision and investment | 13 | includes verdicts, extensions, investment scenarios |
 | F - Optimization | 6 | 5 recommendation-path tasks plus budget guardrails |
-| **Total** | **70** | 63 of 64 FR headings mapped; FR-4.2.6 intentionally unmapped |
+| **Total** | **71** | 63 of 64 FR headings mapped; FR-4.2.6 intentionally excluded |
 
 ## Definition of ready for a task
 
 Before an engineer starts, all of the following must be true:
 
-- Phase 0 exit gate is green.
+- Phase 0 is closed as stated in the entry gate (DB-0.13 G2, DB-0.15 G3, and
+  DB-0.21 G4 complete; DB-0.17 is deferred to Phase 1 optimistic locking).
 - Every `DEPENDS ON` task is accepted.
 - Every `BLOCKED BY` decision is resolved or explicitly waived by the owner.
 - The required database tables and indexes are accepted; no Phase 1 task creates
