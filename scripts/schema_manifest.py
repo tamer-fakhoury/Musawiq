@@ -14,7 +14,35 @@ from __future__ import annotations
 
 # Tables owned by the current revision chain.
 # Populated incrementally by DB-0.3 onward. DB-0.1/0.2 ship zero tables.
-TABLES: dict[str, list[tuple[str, str]]] = {}
+TABLES: dict[str, list[tuple[str, str]]] = {
+    "ad_platforms": [
+        ("code", "text"),
+        ("name", "text"),
+        ("is_active", "boolean"),
+    ],
+    "countries": [
+        ("code", "text"),
+        ("name", "text"),
+        ("is_active", "boolean"),
+    ],
+    "currencies": [
+        ("code", "text"),
+        ("name", "text"),
+        ("minor_unit", "integer"),
+        ("is_active", "boolean"),
+    ],
+    "event_types": [
+        ("code", "text"),
+        ("description", "text"),
+        ("is_active", "boolean"),
+    ],
+    "languages": [
+        ("code", "text"),
+        ("name", "text"),
+        ("direction", "text"),
+        ("is_active", "boolean"),
+    ],
+}
 
 # Extensions that must be installed.
 EXTENSIONS: set[str] = {"citext", "pg_trgm"}
