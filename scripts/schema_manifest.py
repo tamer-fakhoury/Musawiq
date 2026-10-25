@@ -375,6 +375,80 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("captured_at", "timestamptz"),
         ("created_at", "timestamptz"),
     ],
+    "product_concepts": [
+        ("id", "uuid"),
+        ("store_id", "uuid"),
+        ("source_idea_id", "uuid"),
+        ("name", "text"),
+        ("description", "text"),
+        ("category_id", "uuid"),
+        ("niche_id", "uuid"),
+        ("price_minor", "bigint"),
+        ("cost_minor", "bigint"),
+        ("currency", "text"),
+        ("gross_margin_bp", "integer"),
+        ("image_file_id", "uuid"),
+        ("status", "text"),
+        ("version", "integer"),
+        ("created_by", "uuid"),
+        ("deleted_at", "timestamptz"),
+        ("created_at", "timestamptz"),
+        ("updated_at", "timestamptz"),
+    ],
+    "scoring_models": [
+        ("id", "uuid"),
+        ("store_id", "uuid"),
+        ("key", "text"),
+        ("version", "integer"),
+        ("name", "text"),
+        ("description", "text"),
+        ("weights", "jsonb"),
+        ("parameters", "jsonb"),
+        ("is_active", "boolean"),
+        ("effective_from", "timestamptz"),
+        ("created_at", "timestamptz"),
+        ("updated_at", "timestamptz"),
+    ],
+    "sufficiency_checks": [
+        ("id", "uuid"),
+        ("store_id", "uuid"),
+        ("product_concept_id", "uuid"),
+        ("sales_history_status", "text"),
+        ("audience_status", "text"),
+        ("cost_price_status", "text"),
+        ("competitive_data_status", "text"),
+        ("overall_status", "text"),
+        ("blocking_reasons", "jsonb"),
+        ("checked_at", "timestamptz"),
+        ("created_at", "timestamptz"),
+    ],
+    "evaluations": [
+        ("id", "uuid"),
+        ("store_id", "uuid"),
+        ("product_concept_id", "uuid"),
+        ("scoring_model_id", "uuid"),
+        ("model_version", "integer"),
+        ("score", "numeric"),
+        ("score_scale", "integer"),
+        ("confidence", "text"),
+        ("is_reliable", "boolean"),
+        ("sufficiency_check_id", "uuid"),
+        ("input_snapshot", "jsonb"),
+        ("evaluated_at", "timestamptz"),
+        ("created_at", "timestamptz"),
+    ],
+    "score_factors": [
+        ("id", "uuid"),
+        ("store_id", "uuid"),
+        ("evaluation_id", "uuid"),
+        ("factor_key", "text"),
+        ("factor_label", "text"),
+        ("direction", "text"),
+        ("contribution", "numeric"),
+        ("explanation", "text"),
+        ("evidence", "jsonb"),
+        ("created_at", "timestamptz"),
+    ],
 }
 
 # Extensions that must be installed.
@@ -390,7 +464,7 @@ FUNCTIONS: dict[str, str] = {
 TOOL_TABLES = {"schema_migrations", "alembic_version"}
 
 # Tables that are intentionally append-only (no updated_at, mutation blocked).
-APPEND_ONLY_TABLES: set[str] = {"audit_logs"}
+APPEND_ONLY_TABLES: set[str] = {"audit_logs", "score_factors"}
 
 # Tables expected to carry store_id and therefore RLS once DB-0.15 lands.
 TENANT_TABLES: set[str] = {
@@ -409,6 +483,10 @@ TENANT_TABLES: set[str] = {
     "audience_profiles",
     "audience_segments",
     "feedback_items",
+    "product_concepts",
+    "sufficiency_checks",
+    "evaluations",
+    "score_factors",
 }
 
 # Reference/global tables where store_id is nullable by design.
