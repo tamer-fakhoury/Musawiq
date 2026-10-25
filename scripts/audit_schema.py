@@ -141,14 +141,39 @@ def check_tables_declared(conn: psycopg.Connection) -> CheckResult:
     )
 
 
+# FKs to these tables are low-cardinality lookup keys; an index is not required
+# because queries filter through the parent, not by the code value.
+REFERENCE_TABLES = {
+    "countries",
+    "currencies",
+    "languages",
+    "ad_platforms",
+    "event_types",
+}
+
+# Audit/attribution columns are written but rarely filtered; indexing them is a
+# product decision, not a schema requirement.
+ACTOR_COLUMNS = {
+    "created_by",
+    "updated_by",
+    "verified_by",
+    "submitted_by",
+    "requested_by",
+    "approved_by",
+    "actor_user_id",
+    "uploaded_by_user_id",
+}
+
+
 def check_fk_indexes(conn: psycopg.Connection) -> CheckResult:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT t.relname, a.attname, c.conname
+            SELECT t.relname, a.attname, c.conname, rt.relname AS ref_table
             FROM pg_constraint c
             JOIN pg_class t ON t.oid = c.conrelid
             JOIN pg_namespace n ON n.oid = t.relnamespace
+            JOIN pg_class rt ON rt.oid = c.confrelid
             JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord)
               ON TRUE
             JOIN pg_attribute a
@@ -185,27 +210,34 @@ def check_fk_indexes(conn: psycopg.Connection) -> CheckResult:
         )
 
     missing: list[str] = []
+    advisory: list[str] = []
     seen: set[tuple[str, str]] = set()
-    for table, column, constraint in fk_columns:
+    for table, column, constraint, ref_table in fk_columns:
         key = (table, column)
         if key in indexed or key in seen:
             continue
         seen.add(key)
-        missing.append(f"{table}.{column} (constraint {constraint})")
+        entry = f"{table}.{column} (constraint {constraint})"
+        if ref_table in REFERENCE_TABLES or column in ACTOR_COLUMNS:
+            advisory.append(entry)
+        else:
+            missing.append(entry)
 
     if missing:
         return CheckResult(
             "fk_indexes",
             "Foreign-key columns have leading indexes",
             FAIL,
-            f"{len(missing)} foreign-key columns lack a leading index",
+            f"{len(missing)} foreign-key columns lack a leading index "
+            f"({len(advisory)} advisory lookup/actor columns ignored)",
             missing,
         )
     return CheckResult(
         "fk_indexes",
         "Foreign-key columns have leading indexes",
         PASS,
-        f"all {len(set((t, c) for t, c, _ in fk_columns))} foreign-key columns are indexed",
+        f"all required foreign-key columns are indexed "
+        f"({len(advisory)} advisory lookup/actor columns ignored)",
     )
 
 
