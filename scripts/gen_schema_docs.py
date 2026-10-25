@@ -5,9 +5,14 @@ Modes:
                 run ``alembic upgrade head``, introspect, then drop it (default)
     --url DSN   introspect an existing migrated database
 
+Output modes:
+    --write     write ``docs/SCHEMA.md`` (default)
+    --check     generate into a temporary file, compare byte-for-byte with the
+                output path, and exit 1 on drift (0 when in sync)
+
 The document is deterministic: tables, constraints, and indexes are emitted in
 sorted order, and no timestamps, database names, or credentials are embedded.
-Exit code is non-zero if migration or introspection fails.
+Exit code is non-zero if migration, introspection, or the drift check fails.
 """
 
 from __future__ import annotations
@@ -16,6 +21,7 @@ import argparse
 import os
 import subprocess
 import sys
+import tempfile
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -60,7 +66,7 @@ ENTITY_BY_TABLE: dict[str, str] = {
     "events": "Event",
     "feedback_items": "FeedbackItem",
     "generation_runs": "GenerationRun",
-    "idea_evidence": "IdeaEvidence",
+    "idea_evidences": "IdeaEvidence",
     "import_batches": "ImportBatch",
     "import_issues": "ImportIssue",
     "import_rows": "ImportRow",
@@ -419,6 +425,8 @@ def render_table(table: Table) -> list[str]:
 
 
 def render_document(tables: tuple[Table, ...]) -> str:
+    application_tables = [table for table in tables if table.name not in TOOL_TABLES]
+    tool_tables = [table for table in tables if table.name in TOOL_TABLES]
     column_count = sum(len(table.columns) for table in tables)
     constraint_count = sum(len(table.constraints) for table in tables)
     index_count = sum(len(table.indexes) for table in tables)
@@ -430,7 +438,9 @@ def render_document(tables: tuple[Table, ...]) -> str:
         "",
         "## Summary",
         "",
-        f"- Tables: {len(tables)}",
+        f"- Application tables: {len(application_tables)}",
+        f"- Tool-managed tables: {len(tool_tables)}",
+        f"- Public tables: {len(tables)}",
         f"- Columns: {column_count}",
         f"- Constraints: {constraint_count}",
         f"- Indexes: {index_count}",
@@ -459,7 +469,58 @@ def display_path(path: Path) -> str:
     return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
 
 
-def run_scratch(output: Path) -> int:
+def first_difference(expected: str, generated: str) -> tuple[int, str, str, str]:
+    expected_lines = expected.splitlines()
+    generated_lines = generated.splitlines()
+    section = "(document)"
+    limit = max(len(expected_lines), len(generated_lines))
+    for index in range(limit):
+        expected_line = (
+            expected_lines[index] if index < len(expected_lines) else "<missing line>"
+        )
+        generated_line = (
+            generated_lines[index] if index < len(generated_lines) else "<missing line>"
+        )
+        if expected_line == generated_line:
+            continue
+        for prior in expected_lines[: index + 1]:
+            if prior.startswith("## "):
+                section = prior
+        return index + 1, section, expected_line, generated_line
+    return 0, section, "", ""
+
+
+def check_document(document: str, output: Path) -> int:
+    display = display_path(output)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        generated_path = Path(temp_dir) / "SCHEMA.md"
+        write_document(document, generated_path)
+        generated_bytes = generated_path.read_bytes()
+
+    if not output.exists():
+        print(f"SCHEMA DRIFT: {display} does not exist", file=sys.stderr)
+        return 1
+
+    expected_bytes = output.read_bytes()
+    if expected_bytes == generated_bytes:
+        print(f"SCHEMA OK: {display} is in sync")
+        return 0
+
+    expected = expected_bytes.decode("utf-8", errors="replace")
+    generated = generated_bytes.decode("utf-8", errors="replace")
+    line, section, expected_line, generated_line = first_difference(expected, generated)
+    print(f"SCHEMA DRIFT: {display} is out of date", file=sys.stderr)
+    print(f"  first differing section: {section}", file=sys.stderr)
+    if line:
+        print(f"  first differing line: {line}", file=sys.stderr)
+        print(f"  committed: {expected_line!r}", file=sys.stderr)
+        print(f"  generated: {generated_line!r}", file=sys.stderr)
+    else:
+        print("  byte-level difference; line content is equal", file=sys.stderr)
+    return 1
+
+
+def run_scratch(output: Path, check: bool) -> int:
     admin_url = os.getenv("MUSAWIQ_ADMIN_DATABASE_URL")
     if not admin_url:
         print("FAIL: MUSAWIQ_ADMIN_DATABASE_URL is not set", file=sys.stderr)
@@ -483,7 +544,10 @@ def run_scratch(output: Path) -> int:
             check=True,
         )
 
-        write_document(generate(scratch_url), output)
+        document = generate(scratch_url)
+        if check:
+            return check_document(document, output)
+        write_document(document, output)
         print(f"wrote {display_path(output)}")
         return 0
     except Exception as exc:
@@ -501,9 +565,12 @@ def run_scratch(output: Path) -> int:
                 admin.close()
 
 
-def run_url(url: str, output: Path) -> int:
+def run_url(url: str, output: Path, check: bool) -> int:
     try:
-        write_document(generate(url), output)
+        document = generate(url)
+        if check:
+            return check_document(document, output)
+        write_document(document, output)
         print(f"wrote {display_path(output)}")
         return 0
     except Exception as exc:
@@ -523,6 +590,17 @@ def main(argv: list[str] | None = None) -> int:
         "--url",
         help="introspect an existing migrated database instead of creating a scratch one",
     )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--write",
+        action="store_true",
+        help="write the generated document (default)",
+    )
+    mode.add_argument(
+        "--check",
+        action="store_true",
+        help="compare with the output path and exit 1 on drift",
+    )
     parser.add_argument(
         "--output",
         type=Path,
@@ -533,8 +611,8 @@ def main(argv: list[str] | None = None) -> int:
 
     output = args.output if args.output.is_absolute() else ROOT / args.output
     if args.url:
-        return run_url(args.url, output)
-    return run_scratch(output)
+        return run_url(args.url, output, args.check)
+    return run_scratch(output, args.check)
 
 
 if __name__ == "__main__":
