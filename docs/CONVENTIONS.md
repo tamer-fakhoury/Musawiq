@@ -31,7 +31,11 @@ docs/                        Requirements, Specifications, backlog, STATUS
 
 ## Naming
 
-- Tables: `snake_case`, plural (`orders`, `order_items`).
+- Tables: `snake_case`, **plural**. Entity names in `Specifications.md` are singular; the
+  physical table is the plural of the entity (`Product` → `products`, `Order` → `orders`).
+  This avoids quoting reserved words (`user`, `order`).
+- Irregular plurals: `country` → `countries`, `currency` → `currencies`,
+  `category` → `categories`, `budget_policy` → `budget_policies`.
 - Columns: `snake_case`.
 - Money: `<name>_minor` + `currency char(3)`.
 - Rates as inputs: `<name>_bp` (basis points).
@@ -44,6 +48,10 @@ docs/                        Requirements, Specifications, backlog, STATUS
   - `uq_<table>_<columns>`
   - `ix_<table>_<columns>`
 - Triggers: `trg_<table>_<purpose>`; functions: `fn_<purpose>`.
+
+### Reference data
+Reference tables are plural too: `countries`, `currencies`, `languages`, `ad_platforms`,
+`event_types`. They keep natural `code` primary keys and carry no `id` or timestamps.
 
 ## Schema rules
 

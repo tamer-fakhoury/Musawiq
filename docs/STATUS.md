@@ -10,7 +10,7 @@ States: `not_started` → `in_review` → `changes_requested` → `accepted`.
 | DB-0.0 Scaffold + spec amendments | accepted | ff90ffb | 2026-10-25 | Offline alembic + compile + pytest collection verified; live DB run pending credentials |
 | DB-0.1 Migration tooling baseline | accepted | 683f35b | 2026-10-25 | Live verified (up→down→up) |
 | DB-0.2 Extensions & primitives | accepted | 943fb7c | 2026-10-25 | Live verified: 2 extensions, 2 functions, trigger tests pass |
-| DB-0.3 Reference data + seed | not_started | — | — | — |
+| DB-0.3 Reference data + seed | changes_requested | 7f21b69 | 2026-10-25 | Singular table names violate CONVENTIONS plural rule; authorized one-time in-place rewrite of 0003 |
 | DB-0.4 Identity & tenancy | not_started | — | — | Gate G1 |
 | DB-0.5 Integrations & ingestion | not_started | — | — | — |
 | DB-0.6 Audience & context | not_started | — | — | — |
@@ -45,6 +45,7 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 | 2026-10-25 | DB-0.1 | accepted | Single file, empty baseline chain; developer's 5 findings upheld |
 | 2026-10-25 | DB-0.2 | accepted | Extensions + 2 plpgsql functions, no tables; `uuid_extract_version` correction upheld |
 | 2026-10-25 | — | accepted | Live `verify_db`: PARITY OK (0 tables, 2 ext, 2 fns), 9 passed / 2 skipped, EMPTY OK, VERIFY OK |
+| 2026-10-25 | DB-0.3 | changes_requested | 5 reference tables + seed correct, but singular table names; must be plural |
 
 ## Environment
 

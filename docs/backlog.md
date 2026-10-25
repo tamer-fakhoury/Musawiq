@@ -15,7 +15,7 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - `docs/Specifications.md` is the source of truth. No table, column, index, or constraint may exist that is not derivable from it.
 - PostgreSQL 18; native `uuidv7()`; `NULLS NOT DISTINCT` available.
 - Alembic, SQL-first (`op.execute`). Autogenerate is never the source of truth.
-- Naming and layout: see `docs/CONVENTIONS.md`.
+- Naming and layout: see `docs/CONVENTIONS.md`. Physical tables are **plural** (`stores`, `orders`, `users`); entity names in prose are singular.
 - Enum-like values are `text` + `CHECK`, never native `ENUM`.
 - Tenant tables carry `store_id`; reference data does not.
 - Money `*_minor bigint` + `currency char(3)`; rate inputs `*_bp int`; computed metrics `numeric(12,6)`.
@@ -55,23 +55,24 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - No tables created by this task.
 
 ### DB-0.3 Reference data tables and seed
-**TASK:** Create `country(code,name,is_active)`, `currency(code,name,minor_unit,is_active)`, `language(code,name,direction,is_active)`, `ad_platform(code,name,is_active)`, `event_type(code,description,is_active)` and seed them.
+**TASK:** Create `countries(code,name,is_active)`, `currencies(code,name,minor_unit,is_active)`, `languages(code,name,direction,is_active)`, `ad_platforms(code,name,is_active)`, `event_types(code,description,is_active)` and seed them.
 **ACCEPTANCE CRITERIA:**
-- `language.direction` restricted to `ltr | rtl`.
+- `languages.direction` restricted to `ltr | rtl`.
 - Canonical event types seeded: `page_view`, `product_view`, `cta_click`, `whatsapp_click`, `cod_form_start`, `cod_order_submitted`, `deposit_confirmed`.
-- `currency.minor_unit` populated for every seeded currency.
-- `ad_platform` seeded for the MVP platforms (decision D1).
+- `currencies.minor_unit` populated for every seeded currency.
+- `ad_platforms` seeded for the MVP platforms (decision D1).
 - Seed is idempotent (`ON CONFLICT DO NOTHING`) and re-runnable.
 
 ### DB-0.4 Identity & tenancy tables
-**TASK:** Create `store(id,owner_user_id,name,slug,status,default_currency,default_language,timezone,country_code,onboarding_status,settings,deleted_at,created_at,updated_at)`, `user(id,email,password_hash,full_name,phone,locale,timezone,role,status,email_verified_at,last_login_at,auth_provider,auth_subject,deleted_at,created_at,updated_at)`, `audit_log(id,store_id,actor_user_id,actor_type,action,target_type,target_id,before,after,metadata,ip_hash,user_agent,correlation_id,created_at)`, `async_job(id,store_id,job_type,state,idempotency_key,payload,result,progress_current,progress_total,attempt_count,max_attempts,error_code,error_message,correlation_id,scheduled_at,started_at,finished_at,created_at,updated_at)`.
+**TASK:** Create `stores(id,owner_user_id,name,slug,status,default_currency,default_language,timezone,country_code,onboarding_status,settings,deleted_at,created_at,updated_at)`, `users(id,email,password_hash,full_name,phone,locale,timezone,role,status,email_verified_at,last_login_at,auth_provider,auth_subject,deleted_at,created_at,updated_at)`, `audit_logs(id,store_id,actor_user_id,actor_type,action,target_type,target_id,before,after,metadata,ip_hash,user_agent,correlation_id,created_at)`, `async_jobs(id,store_id,job_type,state,idempotency_key,payload,result,progress_current,progress_total,attempt_count,max_attempts,error_code,error_message,correlation_id,scheduled_at,started_at,finished_at,created_at,updated_at)`.
 **ACCEPTANCE CRITERIA:**
-- `store.owner_user_id` FK to `user` and UNIQUE (1 store per user for MVP).
-- `store.slug` UNIQUE; `user.email` UNIQUE; partial UNIQUE on `(auth_provider, auth_subject)`.
-- CHECKs on `store.status`, `store.onboarding_status`, `user.role` (`owner|manager|analyst`), `user.status`, `async_job.job_type`, `async_job.state`, `audit_log.actor_type`.
-- `async_job.idempotency_key` UNIQUE where not null; `async_job.store_id` is nullable (system jobs).
-- `audit_log` is append-only: no `updated_at`, mutation blocked.
-- FKs to `currency`, `language`, `country`.
+- `stores.owner_user_id` FK to `users` and UNIQUE (1 store per user for MVP).
+- `stores.slug` UNIQUE; `users.email` UNIQUE (citext); partial UNIQUE on `(auth_provider, auth_subject)` where both not null.
+- CHECKs on `stores.status`, `stores.onboarding_status`, `users.role` (`owner|manager|analyst`), `users.status`, `async_jobs.job_type`, `async_jobs.state`, `audit_logs.actor_type`.
+- `async_jobs.idempotency_key` UNIQUE where not null; `async_jobs.store_id` is nullable (system jobs).
+- `audit_logs` is append-only: no `updated_at`, mutation blocked by `trg_audit_logs_block_mutation`.
+- FKs to `currencies`, `languages`, `countries`.
+- `fn_touch_updated_at` triggers on `stores`, `users`, `async_jobs`.
 
 ### DB-0.5 Integrations & data ingestion tables
 **TASK:** Create `store_connection(provider,external_store_id,status,scopes,access_token_encrypted,refresh_token_encrypted,token_expires_at,last_synced_at,metadata)`, `ad_account_connection(provider,external_account_id,account_name,status,scopes,access_token_encrypted,refresh_token_encrypted,token_expires_at,last_synced_at,metadata)`, `content_provider(store_id,code,name,media_types,auth_config_encrypted,rate_limits,pricing,capabilities,enabled,is_default)`, `content_generation_job(content_provider_id,type,prompt,negative_prompt,params,status,requested_by,result_creative_ids,cost_minor,currency,error_code,error_message,async_job_id,started_at,finished_at)`, `stored_file(purpose,original_filename,mime_type,size_bytes,checksum_sha256,storage_provider,storage_key,status,uploaded_by_user_id,metadata,deleted_at)`, `import_batch(source_type,stored_file_id,store_connection_id,column_mapping_id,status,strict_mode,date_range_start,date_range_end,total_rows,valid_rows,invalid_rows,duplicate_rows,imported_rows,skipped_rows,error_report_file_id,started_at,completed_at,created_by)`, `column_mapping(name,source_type,mapping,is_default,created_by)`, `import_row(import_batch_id,row_number,raw_data,normalized_data,status,issue_count,created_order_id)`, `import_issue(import_batch_id,import_row_id,row_number,field_name,issue_code,severity,message,raw_value)`, `product(external_product_id,sku,name,description,category_id,currency,cost_minor,price_minor,image_file_id,status,source,metadata,deleted_at)`, `order(origin,external_order_id,order_number,test_id,test_phase,status,currency,subtotal_minor,shipping_minor,discount_minor,total_minor,customer_name,customer_phone,customer_address_enc,landing_page_id,post_id,campaign_id,tracking_session_id,import_batch_id,dedupe_hash,placed_at,imported_at)`, `order_item(order_id,product_id,product_external_id,product_name_snapshot,sku_snapshot,quantity,unit_price_minor,line_total_minor,currency,metadata)`.
