@@ -54,17 +54,22 @@ is enforced in the application layer.
 - `verify_all` -> **VERIFY ALL OK** (~45s)
 - FK matrix: **all deferred candidates resolved**
 
-## PHASE 1: IN PROGRESS
+## PHASE 1: IN PROGRESS - Module 0 (Platform Foundations)
 
-Plan: `docs/backlog-phase1.md` (70 atomic tasks, FR traceability complete).
+Source of truth: `docs/backlog.md` Module 0. Execution detail: `docs/backlog-phase1.md`.
 
-| Task | Owner | State |
-|---|---|---|
-| P1-A1 application scaffold & operational baseline | Engineer 2 | in_review |
-| P1-A1b structured errors + correlation middleware | Engineer 1 | in_review |
-| P1-A2 tenant context & store scoping | Engineer 2 | next |
-| P1-A3 permission matrix & authorization service | Engineer 1 | next |
-| P1-B backlog doc corrections | Engineer 3 | in_review |
+| FR | Atomic task | Owner | State |
+|---|---|---|---|
+| cross-cutting | P1-A1 scaffold + A1b errors/correlation/logging | Engineer 2 / 1 | in_review |
+| FR-0.1 Store data isolation | P1-A2 tenant context & store scoping | Engineer 2 | in progress |
+| FR-0.2 Roles and spend approval | P1-A3 permission matrix & authorization | Engineer 1 | in progress |
+| FR-0.3 Audit trail | P1-A4 audit service + immutable query/export | Engineer 3 | in progress |
+| FR-0.4 Async jobs, idempotency, status | P1-A5 job queue + worker lifecycle | Engineer 1 | queued |
+| FR-0.5 AI governance & degraded mode | P1-A6 provenance + degraded-mode contract | Engineer 2 | next after A2 |
+| planning | P1-B backlog gate + coverage corrections | Engineer 3 | accepted (`77e0d60`) |
+
+Module 0 exits when FR-0.1 through FR-0.5 each have a passing test suite and
+`verify_all` stays green.
 
 ## Team
 
@@ -75,6 +80,7 @@ Plan: `docs/backlog-phase1.md` (70 atomic tasks, FR traceability complete).
 | 3 | `ses_e8d249055fferTS2d662tFXtva` | `docs/backlog-phase1.md` decomposition and corrections |
 
 All engineers must follow `AGENTS.md`. One task per commit, explicit `git add`, no owner-file edits.
+Application verification: `.venv\Scripts\python.exe -m pytest tests/app tests/isolation tests/auth tests/audit_service tests/jobs -q` plus `scripts.verify_all`.
 
 ## Verification contract
 
