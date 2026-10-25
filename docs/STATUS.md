@@ -18,8 +18,8 @@ States: `not_started` -> `in_review` -> `changes_requested` -> `accepted`.
 | DB-0.8 Recommendations | accepted | d722ee2 | 2026-10-25 | 3 tables; source_idea_id circular FK closed |
 | DB-0.9 Assets, campaigns & tests | accepted | 86fb877 | 2026-10-25 | 0.9a/0.9b/0.9c complete; 15 tables added |
 | DB-0.10 Measurement | accepted | fc06b21 | 2026-10-25 | 5 tables; events/attributions append-only; 54 total |
-| DB-0.11 Optimization | in_review | - | - | Engineer 1: rule sets/findings/recommendations/actions/policy/alerts |
-| DB-0.12 Decision & investment | not_started | - | - | - |
+| DB-0.11 Optimization | accepted | 455bb1a | 2026-10-25 | 6 tables; NULLS NOT DISTINCT rule-set versioning |
+| DB-0.12 Decision & investment | in_review | - | - | Engineer 1: rule sets/snapshots/verdicts/investment |
 | DB-0.13 Integrity gate | not_started | - | - | Gate G2 |
 | DB-0.14 Indexing / audit | in_review | c9b2177 | 2026-10-25 | Audit refined (advisory vs required); **82 required FK columns unindexed** - migration after DB-0.12 |
 | DB-0.15 RLS & tenancy | not_started | - | - | Gate G3 |
@@ -38,34 +38,34 @@ States: `not_started` -> `in_review` -> `changes_requested` -> `accepted`.
 | Metric | Value |
 |---|---|
 | Backlog tasks total (DB-0.0..DB-0.24) | 25 |
-| Accepted | 19 |
+| Accepted | 20 |
 | In review / in progress | 1 |
-| Not started | 5 |
-| Schema tables | 54 |
-| Migration revisions | 0001..0012 |
-| Last green verification | `92 passed, 2 skipped`, `VERIFY OK` |
+| Not started | 4 |
+| Schema tables | 60 |
+| Migration revisions | 0001..0013 |
+| Last green verification | `98 passed, 2 skipped`, `VERIFY OK` |
 
-Accepted: DB-0.0-0.10, 0.16, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24.
+Accepted: DB-0.0-0.11, 0.16, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24.
 In review: DB-0.14 (index gap).
-Not started: DB-0.11, 0.12, 0.13, 0.15, 0.17.
+Not started: DB-0.12, 0.13, 0.15, 0.17.
 
 ## Current schema
 
-- Revision head: `0012`
-- 54 tables, 2 extensions, 2 functions
-- Last full verification: `PARITY OK (54 declared tables)`, `92 passed, 2 skipped`, `EMPTY OK`, `VERIFY OK`
+- Revision head: `0013`
+- 60 tables, 2 extensions, 2 functions
+- Last full verification: `PARITY OK (60 declared tables)`, `98 passed, 2 skipped`, `EMPTY OK`, `VERIFY OK`
 
 ## Team
 
 | Engineer | Session | Owns | Current |
 |---|---|---|---|
-| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations `versions/`, `schema_manifest.py`, `tests/db/` | DB-0.11 |
+| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations `versions/`, `schema_manifest.py`, `tests/db/` | DB-0.12 |
 | 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | additive tooling/docs: `gen_schema_docs.py`, `SCHEMA.md`, `PARTITIONING.md`, `RETENTION.md`, `roles.sql`, `ROLES.md`, `pii_scan.py`, `seed_dev.py`, `fk_matrix.py` | DB-0.13a FK matrix |
 | 3 | `ses_e8d249055fferTS2d662tFXtva` | - | **aborted**; WIP finished and committed by owner (`a1a781e`, `1cd15fb`) |
 
 ## Uncommitted work in the tree
 
-- none
+- `scripts/fk_matrix.py`, `docs/SCHEMA.md` (Engineer 2)
 Collision rules: one task per commit; `git add <explicit paths>` only; no amends or reverts of other engineers' commits; owner files are read-only to all engineers.
 
 ## Phase 1+ - Application
@@ -100,6 +100,7 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 | 2026-10-25 | DB-0.10 | accepted | 5 tables; NULLS NOT DISTINCT metrics; 54 tables / 92 passed |
 | 2026-10-25 | DB-0.20a | accepted | Seed idempotent; 13 rows; rule sets correctly SKIPPED until DB-0.11/0.12 |
 | 2026-10-25 | DB-0.24b | accepted | SCHEMA.md refreshed to 54 tables |
+| 2026-10-25 | DB-0.11 | accepted | 6 optimization tables; 60 tables / 98 passed |
 | 2026-10-25 | DB-0.18a | accepted | PII registry + scanner; scan PASS |
 | 2026-10-25 | DB-0.24b | accepted | SCHEMA.md refreshed to 42 tables |
 | 2026-10-25 | DB-0.14a | accepted | Audit harness; **found 52+ unindexed FK columns** |
