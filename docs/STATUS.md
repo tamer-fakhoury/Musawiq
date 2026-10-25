@@ -7,7 +7,7 @@ States: `not_started` → `in_review` → `changes_requested` → `accepted`.
 
 | Task | State | Commit | Reviewed | Notes |
 |---|---|---|---|---|
-| DB-0.0 Scaffold + spec amendments | in_review | — | — | Awaiting local verification |
+| DB-0.0 Scaffold + spec amendments | accepted | ff90ffb | 2026-10-25 | Offline alembic + compile + pytest collection verified; live DB run pending credentials |
 | DB-0.1 Migration tooling baseline | not_started | — | — | Unblocked by DB-0.0 |
 | DB-0.2 Extensions & primitives | not_started | — | — | Blocked by DB-0.1 |
 | DB-0.3 Reference data + seed | not_started | — | — | — |
@@ -41,7 +41,7 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 
 | Date | Task | Verdict | Reason |
 |---|---|---|---|
-| 2026-10-25 | DB-0.0 | in_review | Scaffold, spec amendments A1–A11, ledger created |
+| 2026-10-25 | DB-0.0 | accepted | Scaffold, spec amendments A1–A11, ledger created |
 
 ## Environment
 
