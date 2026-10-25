@@ -191,8 +191,9 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 - If deferred, the exact `ALTER TABLE` plan and PK constraint are documented.
 - Retention windows documented per transient table.
 
-### DB-0.17 Concurrency control and optimistic locking
-**TASK:** Add `version int NOT NULL DEFAULT 1` to mutable aggregates and enforce optimistic concurrency on update.
+### DB-0.17 Concurrency control and optimistic locking — **DEFERRED to Phase 1**
+**DECISION:** Deferred. Optimistic locking is enforced in the application layer (WHERE version = :expected) during Phase 1 instead of a Phase 0 migration. Do not implement in Phase 0.
+**ORIGINAL TASK (for reference):** Add `version int NOT NULL DEFAULT 1` to mutable aggregates and enforce optimistic concurrency on update.
 **ACCEPTANCE CRITERIA:**
 - `version` present on `store`, `user`, `product`, `order`, `product_concept`, `audience_profile`, `landing_page`, `post`, `creative`, `test`, `campaign`, `ad_set`, `ad_variation`, `optimization_recommendation`, `budget_policy`, `investment_profile`, `investment_recommendation`.
 - Stale update (`version` mismatch) returns a conflict, never overwrites.

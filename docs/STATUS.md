@@ -21,10 +21,10 @@ States: `not_started` -> `in_review` -> `changes_requested` -> `accepted`.
 | DB-0.11 Optimization | accepted | 455bb1a | 2026-10-25 | 6 tables; NULLS NOT DISTINCT rule-set versioning |
 | DB-0.12 Decision & investment | accepted | ccac21b | 2026-10-25 | 8 tables; snapshots/verdicts append-only; 68 total |
 | DB-0.13 Integrity gate | in_review | 2d9e960 | 2026-10-25 | FK matrix tooling accepted (201 resolved, 3 deferred); FK pass still to run |
-| DB-0.14 Indexing / audit | in_review | c9b2177 | 2026-10-25 | Audit refined (advisory vs required); **82 required FK columns unindexed** - migration after DB-0.12 |
-| DB-0.15 RLS & tenancy | not_started | - | - | Gate G3 |
+| DB-0.14 Indexing / audit | accepted | e35d881 | 2026-10-25 | 131 indexes; audit now `7 passed, 0 failed` |
+| DB-0.15 RLS & tenancy | in_review | - | - | Engineer 1: FORCE RLS + per-table policy |
 | DB-0.16 Partitioning | accepted | e4fc6c8 | 2026-10-25 | Plan only (DB-0.16a); apply when volume justifies |
-| DB-0.17 Concurrency | not_started | - | - | - |
+| DB-0.17 Concurrency | deferred | - | - | Deferred to Phase 1 app-level optimistic locking |
 | DB-0.18 PII & encryption | accepted | 6072b85 | 2026-10-25 | `docs/PII.md` + `pii_scan.py`; scan PASS |
 | DB-0.19 Roles & privileges | accepted | 19248bc | 2026-10-25 | Authoring only: roles.sql + ROLES.md; 6 tool tests pass |
 | DB-0.20 Seeds & fixtures | accepted | 0f68d01 | 2026-10-25 | Deterministic seed + guide; rule-set rows pending DB-0.20b after DB-0.12 |
@@ -38,33 +38,37 @@ States: `not_started` -> `in_review` -> `changes_requested` -> `accepted`.
 | Metric | Value |
 |---|---|
 | Backlog tasks total (DB-0.0..DB-0.24) | 25 |
-| Accepted | 21 |
+| Accepted | 22 |
 | In review / in progress | 1 |
-| Not started | 3 |
+| Deferred | 1 |
+| Not started | 1 |
 | Schema tables | 68 |
-| Migration revisions | 0001..0014 |
-| Last green verification | `110 passed, 2 skipped`, `VERIFY OK` |
+| Migration revisions | 0001..0015 |
+| Last green verification | `110 passed, 2 skipped`, `VERIFY OK`; audit `7 passed` |
 
-Accepted: DB-0.0-0.12, 0.16, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24.
-In review: DB-0.13 (FK pass), DB-0.14 (index gap).
-Not started: DB-0.15, DB-0.17.
+Accepted: DB-0.0-0.12, 0.14, 0.16, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24.
+In review: DB-0.13 (3 deferred FKs), DB-0.15 (RLS).
+Deferred: DB-0.17 (Phase 1 app-level locking).
 
 ## Current schema
 
-- Revision head: `0014`
-- 68 tables, 2 extensions, 2 functions
+- Revision head: `0015`
+- 68 tables, 2 extensions, 2 functions, 131 indexes
 - Last full verification: `PARITY OK (68 declared tables)`, `110 passed, 2 skipped`, `EMPTY OK`, `VERIFY OK`
+- Schema audit: `7 passed, 0 failed, 0 skipped`
 
 ## Team
 
 | Engineer | Session | Owns | Current |
 |---|---|---|---|
-| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations `versions/`, `schema_manifest.py`, `tests/db/` | DB-0.14 indexes |
-| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | `src/` application scaffold (Slice A) after Phase 0 tooling | Phase 1 scaffold |
+| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations `versions/`, `schema_manifest.py`, `tests/db/` | DB-0.13 -> DB-0.15 |
+| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | `src/` application scaffold (Slice A) | P1-A scaffold, then DB-0.20b seeds |
 | 3 | `ses_e8d249055fferTS2d662tFXtva` | `docs/backlog-phase1.md` (FR decomposition) | re-enabled |
 
 ## Uncommitted work in the tree
 
+- `src/` and `pyproject.toml` (Engineer 2 scaffold)
+- `docs/backlog-phase1.md` (Engineer 3)
 - `docs/SCHEMA.md` (regeneration pending next schema change)
 Collision rules: one task per commit; `git add <explicit paths>` only; no amends or reverts of other engineers' commits; owner files are read-only to all engineers.
 
@@ -103,6 +107,8 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 | 2026-10-25 | DB-0.11 | accepted | 6 optimization tables; 60 tables / 98 passed |
 | 2026-10-25 | DB-0.12 | accepted | 8 decision/investment tables; 68 tables / 110 passed |
 | 2026-10-25 | DB-0.13a | accepted | FK matrix: 201 resolved, 3 deferred candidates |
+| 2026-10-25 | DB-0.14 | accepted | 131 FK/tenant indexes; audit `7 passed, 0 failed` |
+| 2026-10-25 | DB-0.17 | deferred | Optimistic locking moves to Phase 1 application layer |
 | 2026-10-25 | DB-0.18a | accepted | PII registry + scanner; scan PASS |
 | 2026-10-25 | DB-0.24b | accepted | SCHEMA.md refreshed to 42 tables |
 | 2026-10-25 | DB-0.14a | accepted | Audit harness; **found 52+ unindexed FK columns** |
@@ -118,6 +124,16 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 - Credentials: `.env` (gitignored, owner-maintained)
 - Role bootstrap: `musawiq_app` exists and owns `musawiq` + `musawiq_test`
 - Verification: `python -m scripts.verify_db` (creates an isolated scratch DB owned by `musawiq_app`, so RLS runs as a non-superuser)
+
+## Phase 0 exit criteria (simplified)
+
+Phase 0 closes when all of the following are true; DB-0.17 is explicitly out of scope.
+
+1. DB-0.13 accepted (3 deferred FKs, `fk_matrix --check` clean) -> Gate G2
+2. DB-0.15 accepted (FORCE RLS, cross-tenant test green) -> Gate G3
+3. DB-0.20b accepted (seed rule-set rows)
+4. `python -m scripts.verify_all` -> `VERIFY ALL OK`
+5. `docs/SCHEMA.md`, `docs/FK-MATRIX.md`, `docs/AUDIT.md` regenerated at the final schema
 
 ## Open items
 
