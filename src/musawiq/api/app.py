@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 
 from musawiq import __version__
+from musawiq.api.routers.audit import router as audit_router
 from musawiq.api.routers.health import router as health_router
 from musawiq.config import get_settings
 from musawiq.db.session import dispose_engine, get_engine
@@ -40,4 +41,5 @@ def create_app() -> FastAPI:
     )
     app.state.settings = settings
     app.include_router(health_router)
+    app.include_router(audit_router)
     return app
