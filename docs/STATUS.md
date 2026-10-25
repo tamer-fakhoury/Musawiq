@@ -16,57 +16,55 @@ States: `not_started` -> `in_review` -> `changes_requested` -> `accepted`.
 | DB-0.6 Audience & context | accepted | 4955135 | 2026-10-25 | 5 tables + products.category_id FK |
 | DB-0.7 Product evaluation | accepted | 0b674f2 | 2026-10-25 | 5 tables; score_factors append-only |
 | DB-0.8 Recommendations | accepted | d722ee2 | 2026-10-25 | 3 tables; source_idea_id circular FK closed |
-| DB-0.9 Assets, campaigns & tests | in_review | ecacbce | 2026-10-25 | Split a/b/c; 0.9a accepted (38 tables); 0.9b next |
+| DB-0.9 Assets, campaigns & tests | in_review | 3f79f5a | 2026-10-25 | Split a/b/c; 0.9a + 0.9b accepted (42 tables); 0.9c next |
 | DB-0.10 Measurement | not_started | - | - | - |
 | DB-0.11 Optimization | not_started | - | - | - |
 | DB-0.12 Decision & investment | not_started | - | - | - |
 | DB-0.13 Integrity gate | not_started | - | - | Gate G2 |
-| DB-0.14 Indexing / audit | in_review | - | - | Engineer 3: audit_schema.py |
+| DB-0.14 Indexing / audit | in_review | a1a781e | 2026-10-25 | Audit harness accepted; **52+ FK columns lack indexes** - index migration scheduled after DB-0.12 |
 | DB-0.15 RLS & tenancy | not_started | - | - | Gate G3 |
 | DB-0.16 Partitioning | accepted | e4fc6c8 | 2026-10-25 | Plan only (DB-0.16a); apply when volume justifies |
 | DB-0.17 Concurrency | not_started | - | - | - |
-| DB-0.18 PII & encryption | not_started | - | - | - |
+| DB-0.18 PII & encryption | accepted | 6072b85 | 2026-10-25 | `docs/PII.md` + `pii_scan.py`; scan PASS |
 | DB-0.19 Roles & privileges | accepted | 19248bc | 2026-10-25 | Authoring only: roles.sql + ROLES.md; 6 tool tests pass |
 | DB-0.20 Seeds & fixtures | not_started | - | - | - |
-| DB-0.21 Verification pipeline | in_review | - | - | Engineer 3: audit reporting |
-| DB-0.22 Performance baseline | in_review | - | - | Engineer 3: bench_db.py |
+| DB-0.21 Verification pipeline | accepted | a1a781e | 2026-10-25 | Audit report generation + tests |
+| DB-0.22 Performance baseline | accepted | 1cd15fb | 2026-10-25 | 4 queries PASS, p95 < 3 ms |
 | DB-0.23 Retention & purge | accepted | fe2dc71 | 2026-10-25 | Plan only (DB-0.23a) |
-| DB-0.24 Schema docs & traceability | accepted | c9e2dc1 | 2026-10-25 | Generator + 38-table doc + `--check` drift gate |
+| DB-0.24 Schema docs & traceability | accepted | 2f29462 | 2026-10-25 | Generator + 42-table doc + `--check` drift gate |
 
 ## Progress
 
 | Metric | Value |
 |---|---|
 | Backlog tasks total (DB-0.0..DB-0.24) | 25 |
-| Accepted | 13 |
-| In review / in progress | 5 |
+| Accepted | 16 |
+| In review / in progress | 2 |
 | Not started | 7 |
-| Schema tables | 38 |
-| Migration revisions | 0001..0009 |
-| Last green verification | `65 passed, 2 skipped`, `VERIFY OK` |
+| Schema tables | 42 |
+| Migration revisions | 0001..0010 |
+| Last green verification | `73 passed, 2 skipped`, `VERIFY OK` |
 
-Accepted: DB-0.0-0.8, 0.16, 0.19, 0.23, 0.24.
-In review: DB-0.9, 0.14, 0.18, 0.21, 0.22.
+Accepted: DB-0.0-0.8, 0.16, 0.18, 0.19, 0.21, 0.22, 0.23, 0.24.
+In review: DB-0.9, 0.14.
 Not started: DB-0.10, 0.11, 0.12, 0.13, 0.15, 0.17, 0.20.
 
 ## Current schema
 
-- Revision head: `0009`
-- 38 tables, 2 extensions, 2 functions
-- Last full verification: `PARITY OK (38 declared tables)`, `65 passed, 2 skipped`, `EMPTY OK`, `VERIFY OK`
+- Revision head: `0010`
+- 42 tables, 2 extensions, 2 functions
+- Last full verification: `PARITY OK (42 declared tables)`, `73 passed, 2 skipped`, `EMPTY OK`, `VERIFY OK`
 
 ## Team
 
 | Engineer | Session | Owns | Current |
 |---|---|---|---|
-| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations `versions/`, `schema_manifest.py`, `tests/db/` | DB-0.9b |
-| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | additive tooling/docs: `gen_schema_docs.py`, `SCHEMA.md`, `PARTITIONING.md`, `RETENTION.md`, `roles.sql`, `ROLES.md`, `pii_scan.py` | DB-0.18a PII scan (WIP) |
-| 3 | `ses_e8d249055fferTS2d662tFXtva` | `audit_schema.py`, `bench_db.py`, `AUDIT.md`, `PERFORMANCE.md`, `tests/audit/` | DB-0.14a/0.21a/0.22a (WIP, uncommitted) |
+| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations `versions/`, `schema_manifest.py`, `tests/db/` | DB-0.9c |
+| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | additive tooling/docs: `gen_schema_docs.py`, `SCHEMA.md`, `PARTITIONING.md`, `RETENTION.md`, `roles.sql`, `ROLES.md`, `pii_scan.py` | idle; next DB-0.20a dev seeds |
+| 3 | `ses_e8d249055fferTS2d662tFXtva` | - | **aborted**; WIP finished and committed by owner (`a1a781e`, `1cd15fb`) |
 
 ## Uncommitted work in the tree
 
-- `scripts/audit_schema.py`, `scripts/bench_db.py`, `docs/AUDIT.md`, `docs/PERFORMANCE.md`, `tests/audit/` (Engineer 3)
-- `audit_out.json` at repo root (Engineer 3 scratch output, must be deleted, never committed)
 
 Collision rules: one task per commit; `git add <explicit paths>` only; no amends or reverts of other engineers' commits; owner files are read-only to all engineers.
 
@@ -96,6 +94,12 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 | 2026-10-25 | DB-0.9a | accepted | 4 tables, circular FKs added via ALTER; 38 tables / 65 passed |
 | 2026-10-25 | DB-0.24b | accepted | SCHEMA.md regenerated for 38 tables |
 | 2026-10-25 | DB-0.24c | accepted | `--check` drift gate; 8 tool tests pass |
+| 2026-10-25 | DB-0.9b | accepted | 4 tables; order_channels.post_id FK closed; 42 tables / 73 passed |
+| 2026-10-25 | DB-0.18a | accepted | PII registry + scanner; scan PASS |
+| 2026-10-25 | DB-0.24b | accepted | SCHEMA.md refreshed to 42 tables |
+| 2026-10-25 | DB-0.14a | accepted | Audit harness; **found 52+ unindexed FK columns** |
+| 2026-10-25 | DB-0.21a | accepted | AUDIT.md report generation |
+| 2026-10-25 | DB-0.22a | accepted | PERF baseline: 4 queries PASS, p95 < 3 ms |
 | 2026-10-25 | docs | repaired | PowerShell round-trip had mojibake'd `backlog.md`; fixed 124 sequences |
 
 ## Environment
@@ -113,4 +117,5 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 - DB-0.13: add all deferred cross-domain FKs, then Gate G2.
 - DB-0.15: RLS policies; then Gate G3.
 - DB-0.24: regenerate `SCHEMA.md` after schema freeze.
-- Engineer 3 must not commit its scratch output `audit_out.json` at the repo root.
+- DB-0.14 index migration must land after DB-0.12 (last table-creating task) and before DB-0.13/G2.
+- Tooling duplication: `audit_schema.py` and `bench_db.py` each reimplement scratch-DB creation; consolidate into `scripts/db_scratch.py` during DB-0.21 follow-up.
