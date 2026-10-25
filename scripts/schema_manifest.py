@@ -42,6 +42,77 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("direction", "text"),
         ("is_active", "boolean"),
     ],
+    "users": [
+        ("id", "uuid"),
+        ("email", "text"),
+        ("password_hash", "text"),
+        ("full_name", "text"),
+        ("phone", "text"),
+        ("locale", "text"),
+        ("timezone", "text"),
+        ("role", "text"),
+        ("status", "text"),
+        ("email_verified_at", "timestamptz"),
+        ("last_login_at", "timestamptz"),
+        ("auth_provider", "text"),
+        ("auth_subject", "text"),
+        ("deleted_at", "timestamptz"),
+        ("created_at", "timestamptz"),
+        ("updated_at", "timestamptz"),
+    ],
+    "stores": [
+        ("id", "uuid"),
+        ("owner_user_id", "uuid"),
+        ("name", "text"),
+        ("slug", "text"),
+        ("status", "text"),
+        ("default_currency", "text"),
+        ("default_language", "text"),
+        ("timezone", "text"),
+        ("country_code", "text"),
+        ("onboarding_status", "text"),
+        ("settings", "jsonb"),
+        ("deleted_at", "timestamptz"),
+        ("created_at", "timestamptz"),
+        ("updated_at", "timestamptz"),
+    ],
+    "audit_logs": [
+        ("id", "uuid"),
+        ("store_id", "uuid"),
+        ("actor_user_id", "uuid"),
+        ("actor_type", "text"),
+        ("action", "text"),
+        ("target_type", "text"),
+        ("target_id", "uuid"),
+        ("before", "jsonb"),
+        ("after", "jsonb"),
+        ("metadata", "jsonb"),
+        ("ip_hash", "text"),
+        ("user_agent", "text"),
+        ("correlation_id", "uuid"),
+        ("created_at", "timestamptz"),
+    ],
+    "async_jobs": [
+        ("id", "uuid"),
+        ("store_id", "uuid"),
+        ("job_type", "text"),
+        ("state", "text"),
+        ("idempotency_key", "text"),
+        ("payload", "jsonb"),
+        ("result", "jsonb"),
+        ("progress_current", "integer"),
+        ("progress_total", "integer"),
+        ("attempt_count", "integer"),
+        ("max_attempts", "integer"),
+        ("error_code", "text"),
+        ("error_message", "text"),
+        ("correlation_id", "uuid"),
+        ("scheduled_at", "timestamptz"),
+        ("started_at", "timestamptz"),
+        ("finished_at", "timestamptz"),
+        ("created_at", "timestamptz"),
+        ("updated_at", "timestamptz"),
+    ],
 }
 
 # Extensions that must be installed.
@@ -57,18 +128,18 @@ FUNCTIONS: dict[str, str] = {
 TOOL_TABLES = {"schema_migrations", "alembic_version"}
 
 # Tables that are intentionally append-only (no updated_at, mutation blocked).
-APPEND_ONLY_TABLES: set[str] = set()
+APPEND_ONLY_TABLES: set[str] = {"audit_logs"}
 
 # Tables expected to carry store_id and therefore RLS once DB-0.15 lands.
 TENANT_TABLES: set[str] = set()
 
 # Reference/global tables where store_id is nullable by design.
 GLOBAL_NULLABLE_TENANT_TABLES: set[str] = {
-    "content_provider",
-    "niche",
-    "scoring_model",
-    "optimization_rule_set",
-    "decision_rule_set",
-    "async_job",
-    "audit_log",
+    "content_providers",
+    "niches",
+    "scoring_models",
+    "optimization_rule_sets",
+    "decision_rule_sets",
+    "async_jobs",
+    "audit_logs",
 }
