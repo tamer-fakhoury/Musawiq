@@ -8,7 +8,7 @@ States: `not_started` → `in_review` → `changes_requested` → `accepted`.
 | Task | State | Commit | Reviewed | Notes |
 |---|---|---|---|---|
 | DB-0.0 Scaffold + spec amendments | accepted | ff90ffb | 2026-10-25 | Offline alembic + compile + pytest collection verified; live DB run pending credentials |
-| DB-0.1 Migration tooling baseline | not_started | — | — | Unblocked by DB-0.0 |
+| DB-0.1 Migration tooling baseline | accepted | 683f35b | 2026-10-25 | Offline chain verified owner-side; live `verify_db` pending `.env` |
 | DB-0.2 Extensions & primitives | not_started | — | — | Blocked by DB-0.1 |
 | DB-0.3 Reference data + seed | not_started | — | — | — |
 | DB-0.4 Identity & tenancy | not_started | — | — | Gate G1 |
@@ -42,6 +42,7 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 | Date | Task | Verdict | Reason |
 |---|---|---|---|
 | 2026-10-25 | DB-0.0 | accepted | Scaffold, spec amendments A1–A11, ledger created |
+| 2026-10-25 | DB-0.1 | accepted | Single file, empty baseline chain; developer's 5 findings upheld |
 
 ## Environment
 
@@ -50,3 +51,4 @@ Not started. No `FR-*` task may begin before Phase 0 exit.
 - Git: 2.40.1
 - Verification: `python -m scripts.verify_db` (no CI host)
 - Credentials: `.env` (gitignored), maintained by the project owner
+- **BLOCKER:** `.env` does not exist yet. Live `verify_db` cannot run.

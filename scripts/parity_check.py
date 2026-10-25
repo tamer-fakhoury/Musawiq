@@ -17,6 +17,8 @@ import psycopg
 
 from scripts.schema_manifest import (
     APPEND_ONLY_TABLES,
+    EXTENSIONS,
+    FUNCTIONS,
     TABLES,
     TOOL_TABLES,
 )
@@ -86,6 +88,26 @@ def native_enums(conn: psycopg.Connection) -> list[str]:
         return [row[0] for row in cur.fetchall()]
 
 
+def installed_extensions(conn: psycopg.Connection) -> set[str]:
+    with conn.cursor() as cur:
+        cur.execute("SELECT extname FROM pg_extension")
+        return {row[0] for row in cur.fetchall()}
+
+
+def public_functions(conn: psycopg.Connection) -> dict[str, str]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT p.proname, l.lanname
+            FROM pg_proc p
+            JOIN pg_namespace n ON n.oid = p.pronamespace
+            JOIN pg_language l ON l.oid = p.prolang
+            WHERE n.nspname = 'public'
+            """
+        )
+        return {name: lang for name, lang in cur.fetchall()}
+
+
 def missing_updatable_version(conn: psycopg.Connection) -> list[str]:
     """Append-only tables must not carry updated_at."""
     findings: list[str] = []
@@ -113,6 +135,21 @@ def main(argv: list[str] | None = None) -> int:
         for enum_name in native_enums(conn):
             problems.append(f"native ENUM type not allowed: {enum_name}")
 
+        installed = installed_extensions(conn)
+        for extension in sorted(EXTENSIONS):
+            if extension not in installed:
+                problems.append(f"missing extension: {extension}")
+
+        functions = public_functions(conn)
+        for name, language in sorted(FUNCTIONS.items()):
+            actual = functions.get(name)
+            if actual is None:
+                problems.append(f"missing function: {name}()")
+            elif actual != language:
+                problems.append(
+                    f"function language drift: {name}() expected {language}, got {actual}"
+                )
+
         for table, columns in TABLES.items():
             if table not in live:
                 problems.append(f"missing table: {table}")
@@ -138,7 +175,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  - {problem}")
         return 1
 
-    print(f"PARITY OK ({len(TABLES)} declared tables)")
+    print(
+        f"PARITY OK ({len(TABLES)} declared tables, "
+        f"{len(EXTENSIONS)} extensions, {len(FUNCTIONS)} functions)"
+    )
     return 0
 
 

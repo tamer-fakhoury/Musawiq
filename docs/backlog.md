@@ -11,25 +11,48 @@ Build the schema before any application feature. Each task is complete only when
 runs clean on a fresh database, rolls back cleanly, and matches `## Entity Fields` and the
 `## ERD Diagram` in `Specifications.md`.
 
+**Ground rules**
+- `docs/Specifications.md` is the source of truth. No table, column, index, or constraint may exist that is not derivable from it.
+- PostgreSQL 18; native `uuidv7()`; `NULLS NOT DISTINCT` available.
+- Alembic, SQL-first (`op.execute`). Autogenerate is never the source of truth.
+- Naming and layout: see `docs/CONVENTIONS.md`.
+- Enum-like values are `text` + `CHECK`, never native `ENUM`.
+- Tenant tables carry `store_id`; reference data does not.
+- Money `*_minor bigint` + `currency char(3)`; rate inputs `*_bp int`; computed metrics `numeric(12,6)`.
+- JSONB only for configuration, payloads, and snapshots; always carries `schema_version`.
+- No application code writes to a table before that table's owning DB task is accepted.
+
+**Definition of Done (applies to every DB task)**
+1. Migration `up` and `down` both run cleanly on an empty database.
+2. `information_schema` diff against `Specifications.md` for the tables in scope is empty.
+3. All CHECK, UNIQUE, FK, and NOT NULL constraints exist and are named.
+4. Indexes exist for the access patterns the spec calls out; `EXPLAIN` shows no sequential scan on the intended paths.
+5. A test asserts the task's constraints actually reject invalid rows.
+6. RLS policy is attached where the table is tenant-owned (from DB-0.15).
+7. The migration is committed with the parity/regression evidence that guards it.
+
 ## Module DB — Schema Construction (P0)
 
 ### DB-0.1 Migration tooling and project baseline
 **TASK:** Configure a versioned migration tool with an ordered migration directory, one migration per DB task, committed generated SQL, and a `schema_migrations` tracking table.
 **ACCEPTANCE CRITERIA:**
 - `up` and `down` run cleanly from empty to empty.
-- CI applies all migrations to a throwaway database.
+- Local verification (`scripts/verify_db.py`) applies all migrations to a throwaway database. (No CI host in this project.)
 - Credentials come from environment variables only.
-- Naming and folder conventions are documented in the repo.
+- Naming and folder conventions are documented in `docs/CONVENTIONS.md`.
+- Expected baseline result: `PARITY OK (0 declared tables, 0 extensions, 0 functions)`, `5 passed, 2 skipped` (RLS tests skip until DB-0.15), `EMPTY OK`, `VERIFY OK`.
 
 ### DB-0.2 Extensions, conventions, and shared primitives
-**TASK:** On PostgreSQL 18, use the native `uuidv7()` as the default for every `id`; install `citext` and `pg_trgm`; add `fn_touch_updated_at()` for mutable tables and `fn_block_mutation()` for append-only tables.
+**TASK:** On PostgreSQL 18, rely on native `uuidv7()` for all `id` defaults; install `citext` and `pg_trgm`; add `fn_touch_updated_at()` for mutable tables and `fn_block_mutation()` for append-only tables.
 **ACCEPTANCE CRITERIA:**
-- Every new row gets a UUIDv7 primary key by default via native `uuidv7()` (no plpgsql shim).
-- `citext` and `pg_trgm` extensions installed; `pgcrypto` only if a hash function is needed.
-- `updated_at` auto-updates on mutating tables only.
-- `UPDATE`/`DELETE` on append-only tables raises an exception.
-- Enum-like columns use `text` + `CHECK`; no native `ENUM` types.
-- Money uses `*_minor bigint` + `currency char(3)`; rate inputs use `*_bp int`; computed metrics use `numeric(12,6)`.
+- `citext` and `pg_trgm` installed via the migration; `pgcrypto` only if a hash function is needed.
+- `uuidv7()` is available natively (no plpgsql shim) and returns a version-7 UUID.
+- `fn_touch_updated_at()` exists in `public`, `LANGUAGE plpgsql`, and sets `NEW.updated_at = now()`.
+- `fn_block_mutation()` exists in `public`, `LANGUAGE plpgsql`, and raises an exception on `UPDATE` or `DELETE`.
+- Both functions are proven by tests that create a temporary table, attach the triggers, assert the behaviour, then roll back.
+- `scripts/schema_manifest.py` declares both extensions and both functions; parity passes.
+- `up`/`down` reversible; `down` drops the functions and does not drop extensions still needed by later revisions (keep `citext`/`pg_trgm` installed on downgrade).
+- No tables created by this task.
 
 ### DB-0.3 Reference data tables and seed
 **TASK:** Create `country(code,name,is_active)`, `currency(code,name,minor_unit,is_active)`, `language(code,name,direction,is_active)`, `ad_platform(code,name,is_active)`, `event_type(code,description,is_active)` and seed them.

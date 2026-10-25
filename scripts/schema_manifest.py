@@ -13,8 +13,14 @@ harmless type-syntax differences while still catching structural mistakes.
 from __future__ import annotations
 
 # Tables owned by the current revision chain.
-# Populated incrementally by DB-0.2 onward. DB-0.1 ships empty.
+# Populated incrementally by DB-0.3 onward. DB-0.1/0.2 ship zero tables.
 TABLES: dict[str, list[tuple[str, str]]] = {}
+
+# Extensions that must be installed.
+EXTENSIONS: set[str] = set()
+
+# Functions that must exist in the public schema: name -> language.
+FUNCTIONS: dict[str, str] = {}
 
 # Tables that must exist but are managed by the tool, not by our migrations.
 TOOL_TABLES = {"schema_migrations", "alembic_version"}
