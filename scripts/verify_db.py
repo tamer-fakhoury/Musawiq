@@ -25,8 +25,10 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 import psycopg
+from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(ROOT / ".env")
 
 
 def libpq_url(url: str) -> str:
@@ -79,9 +81,24 @@ def main(argv: list[str] | None = None) -> int:
 
     admin = psycopg.connect(libpq_url(admin_url), autocommit=True)
     try:
+        app_user = urlsplit(app_url).username
         with admin.cursor() as cur:
-            cur.execute(f"CREATE DATABASE {quote_ident(scratch)}")
-        print(f"created scratch database: {scratch}")
+            if app_user:
+                try:
+                    cur.execute(
+                        f"CREATE DATABASE {quote_ident(scratch)} "
+                        f"OWNER {quote_ident(app_user)}"
+                    )
+                except psycopg.errors.UndefinedObject:
+                    print(
+                        f"FAIL: database role {app_user!r} does not exist; "
+                        "create it or fix MUSAWIQ_DATABASE_URL",
+                        file=sys.stderr,
+                    )
+                    return 1
+            else:
+                cur.execute(f"CREATE DATABASE {quote_ident(scratch)}")
+        print(f"created scratch database: {scratch} (owner: {app_user or 'admin'})")
 
         try:
             run_step(
