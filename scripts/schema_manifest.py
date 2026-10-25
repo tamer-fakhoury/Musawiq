@@ -17,10 +17,13 @@ from __future__ import annotations
 TABLES: dict[str, list[tuple[str, str]]] = {}
 
 # Extensions that must be installed.
-EXTENSIONS: set[str] = set()
+EXTENSIONS: set[str] = {"citext", "pg_trgm"}
 
 # Functions that must exist in the public schema: name -> language.
-FUNCTIONS: dict[str, str] = {}
+FUNCTIONS: dict[str, str] = {
+    "fn_block_mutation": "plpgsql",
+    "fn_touch_updated_at": "plpgsql",
+}
 
 # Tables that must exist but are managed by the tool, not by our migrations.
 TOOL_TABLES = {"schema_migrations", "alembic_version"}
