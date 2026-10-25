@@ -67,6 +67,8 @@ docs/                        Requirements, Specifications, backlog, STATUS
 ```
 .venv\Scripts\python.exe -m scripts.verify_db
 ```
-Expected when RLS is not yet implemented: `5 passed, 2 skipped`.
+
+The expected test count grows with every task; the invariant is **0 failures**.
+Current expectation after DB-0.2: `9 passed, 2 skipped` (RLS skipped until DB-0.15).
 
 Add `--expect-rls` from DB-0.15 onward.
