@@ -97,14 +97,17 @@ Current execution still follows Module 1.1 endpoints and Module 1.2.
 
 ## Team
 
-| Engineer | Session | Owns |
-|---|---|---|
-| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | migrations (frozen), `src/musawiq/auth`, `src/musawiq/middleware` |
-| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | `src/` scaffold, `src/musawiq/api`, `repositories`, `db` |
-| 3 | `ses_e8d249055fferTS2d662tFXtva` | `docs/backlog-phase1.md` decomposition and corrections |
+| Engineer | Session | Owns | Current |
+|---|---|---|---|
+| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | `migrations/` (frozen), `services/imports.py`, `api/routers/imports.py`, `tests/import_validation/` | FR-1.1.3 validation |
+| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | - | **aborted** (hung tool call); FR-0.1 completed by owner |
+| 3 | `ses_e8d249055fferTS2d662tFXtva` | `services/import_mapping.py`, `services/import_preview.py`, `api/routers/import_preview.py` | FR-1.1.4 preview |
+| 4 | `ses_e87eeee57ffeJVCYG3dOPI2g07` | `services/audience.py`, `api/routers/audiences.py`, `api/routers/categories.py` | FR-1.2.1/1.2.2 audience |
+| 5 | `ses_e87eeede4ffegiyAr4soulsF41` | `web/**` (Next.js) | FR-6.1 UI scaffold |
 
-All engineers must follow `AGENTS.md`. One task per commit, explicit `git add`, no owner-file edits.
-Application verification: `.venv\Scripts\python.exe -m pytest tests/app tests/isolation tests/auth tests/audit_service tests/jobs -q` plus `scripts.verify_all`.
+All engineers follow `AGENTS.md`. One task per commit, explicit `git add`, no owner-file edits, acceptance-criteria-only tests.
+
+Router registration is owner-only: engineers create routers but do not edit `api/app.py`.
 
 ## Verification contract
 
