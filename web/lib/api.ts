@@ -39,6 +39,23 @@ function isApiErrorBody(value: unknown): value is ApiErrorBody {
   );
 }
 
+function demoHeaders(init?: HeadersInit): Headers {
+  const headers = new Headers(init);
+  const storeId = process.env.NEXT_PUBLIC_DEMO_STORE_ID;
+  const userId = process.env.NEXT_PUBLIC_DEMO_USER_ID;
+  const role = process.env.NEXT_PUBLIC_DEMO_USER_ROLE || "owner";
+
+  if (storeId) {
+    headers.set("X-Store-Id", storeId);
+  }
+  if (userId) {
+    headers.set("X-User-Id", userId);
+  }
+  headers.set("X-User-Role", role);
+
+  return headers;
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
@@ -52,7 +69,10 @@ export async function apiFetch<T>(
     });
   }
 
-  const response = await fetch(`${baseUrl}${path}`, init);
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: demoHeaders(init?.headers),
+  });
 
   if (!response.ok) {
     let body: unknown = null;

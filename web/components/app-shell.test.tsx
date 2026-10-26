@@ -4,14 +4,14 @@ import { describe, expect, it } from "vitest";
 import { AppShell } from "@/components/app-shell";
 
 describe("AppShell", () => {
-  it("renders the brand and a nav item", () => {
+  it("renders the brand and an Arabic nav item", () => {
     render(
       <AppShell>
-        <p>Empty state</p>
+        <p>حالة فارغة</p>
       </AppShell>,
     );
 
     expect(screen.getByText("Musawiq")).toBeInTheDocument();
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("لوحة التحكم")).toBeInTheDocument();
   });
 });

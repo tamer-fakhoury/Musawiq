@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Musawiq",
-  description: "Product-testing platform",
+  title: "Musawiq — مساوق",
+  description: "منصة اختبار المنتجات وتحسين الحملات الإعلانية",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="ar" dir="rtl" className="h-full antialiased">
       <body className="min-h-full">{children}</body>
     </html>
   );
