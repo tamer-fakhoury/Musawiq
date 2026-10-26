@@ -65,15 +65,20 @@ Source of truth: `docs/backlog.md` Module 0. Execution detail: `docs/backlog-pha
 | FR-0.2 Roles and spend approval | P1-A3 permission matrix & authorization | E1 | accepted | `079b1c3` |
 | FR-0.3 Audit trail | P1-A4 audit service + query/export | E3 | accepted | `aca6ced`, `abd8f5b` |
 | FR-0.4 Async jobs, idempotency, status | P1-A5 job queue + worker lifecycle | E1 | accepted | `a375224` |
-| FR-0.5 AI governance & degraded mode | P1-A6 provenance + degraded mode | E1 | in progress | - |
-| Module 1.1 prerequisite | P1-A7 local file storage adapter | E3 | in progress | - |
+| FR-0.5 AI governance & degraded mode | P1-A6 provenance + degraded mode | E1 | accepted* | `845696f` |
+| Module 1.1 prerequisite | P1-A7 local file storage adapter | E3 | accepted | `4367433` |
+| integration | register `jobs` + `ai` routers in `create_app` | E2 | in progress | - |
+
+`*` FR-0.5 accepted pending router wiring: `ai.py` and `jobs.py` exist and are
+tested against a locally-built app, but `create_app` does not include them yet.
+Engineer 2 adds the two `include_router` lines plus a route smoke test.
 | planning | P1-B backlog gate + coverage corrections | E3 | accepted | `77e0d60` |
 
 Module 0 exits when FR-0.1 through FR-0.5 each have a passing test suite and
 `verify_all` stays green. 3 of 5 FRs are accepted; FR-0.1 and FR-0.5 are in flight.
 
 Application tests: `pytest tests/app tests/isolation tests/auth tests/audit_service tests/jobs tests/ai tests/storage -q`
-(60 passing at last run).
+(81 passing at last run).
 
 ## Team
 
