@@ -25,6 +25,13 @@ export type AdSet = {
   variations?: AdVariation[];
 };
 
+export type CopyVariant = {
+  headline: string;
+  copy_text: string;
+  description: string;
+  angle_ar: string;
+};
+
 export type MetricSnapshot = {
   period_start: string;
   period_end: string;

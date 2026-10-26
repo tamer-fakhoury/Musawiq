@@ -21,7 +21,7 @@ import {
   type Analysis,
   type AnalysisSummary,
 } from "@/lib/analyses";
-import { formatDate } from "@/lib/campaigns";
+import { formatDate, type CopyVariant } from "@/lib/campaigns";
 
 const cardClass = "rounded-lg border border-zinc-200 bg-white p-5";
 const secondaryButtonClass =
@@ -43,6 +43,10 @@ export default function CampaignAnalysisPage() {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [notAvailable, setNotAvailable] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const [variants, setVariants] = useState<CopyVariant[]>([]);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -138,6 +142,44 @@ export default function CampaignAnalysisPage() {
     }
   }
 
+  async function suggestCopy() {
+    setSuggesting(true);
+    setSuggestError(null);
+    try {
+      const data = await apiFetch<{ variants: CopyVariant[] }>(
+        `/campaigns/${campaignId}/variations/suggest`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ count: 3 }),
+        },
+      );
+      setVariants(Array.isArray(data.variants) ? data.variants : []);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.status === 429) {
+          setSuggestError(
+            "تم تجاوز الحد المسموح من الاقتراحات. حاول مرة أخرى بعد قليل.",
+          );
+        } else if (error.status === 503) {
+          setSuggestError(
+            "مزوّد الذكاء الاصطناعي غير متاح حالياً، لذلك لم تُنتج اقتراحات.",
+          );
+        } else if (error.status === 502) {
+          setSuggestError("تعذّر توليد نصوص صالحة. حاول مرة أخرى.");
+        } else if (error.status === 404) {
+          setSuggestError("الحملة غير موجودة.");
+        } else {
+          setSuggestError("تعذّر توليد النصوص. حاول مرة أخرى.");
+        }
+      } else {
+        setSuggestError("تعذّر توليد النصوص. حاول مرة أخرى.");
+      }
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
   return (
     <AppShell>
       <div className="space-y-6">
@@ -201,6 +243,71 @@ export default function CampaignAnalysisPage() {
             لم يتم اختيار تحليل بعد. شغّل تحليلاً جديداً أو اختر تحليلاً سابقاً.
           </p>
         )}
+
+        <section className={cardClass}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold">اقترح نصوصاً جديدة</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                ثلاثة نصوص بديلة للمراجعة اليدوية. لا تُحفظ الاقتراحات.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void suggestCopy()}
+              disabled={suggesting}
+              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {suggesting ? "جارٍ التوليد…" : "اقترح نصوصاً"}
+            </button>
+          </div>
+          {suggesting ? (
+            <p role="status" className="mt-3 text-sm text-zinc-600">
+              قد يستغرق توليد النصوص عدة ثوانٍ.
+            </p>
+          ) : null}
+          {suggestError ? (
+            <p role="alert" className="mt-3 text-sm text-red-700">
+              {suggestError}
+            </p>
+          ) : null}
+          {variants.length > 0 ? (
+            <ul className="mt-4 grid gap-3 md:grid-cols-2">
+              {variants.map((variant, index) => {
+                const key = `${campaignId}-suggest-${index}`;
+                const copyText = [
+                  variant.headline,
+                  variant.copy_text,
+                  variant.description,
+                ].join("\n");
+                return (
+                  <li
+                    key={`${variant.headline}-${index}`}
+                    className="rounded-md border border-zinc-200 p-3"
+                  >
+                    <p className="text-sm font-semibold">{variant.headline}</p>
+                    <p className="mt-2 text-sm text-zinc-700">
+                      {variant.copy_text}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {variant.description}
+                    </p>
+                    <p className="mt-2 text-xs text-zinc-500">
+                      الزاوية: {variant.angle_ar}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void copy(key, copyText)}
+                      className={`${secondaryButtonClass} mt-3`}
+                    >
+                      {copiedKey === key ? "تم النسخ" : "نسخ النص"}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </section>
 
         <section className={cardClass}>
           <h2 className="text-base font-semibold">التحليلات السابقة</h2>
