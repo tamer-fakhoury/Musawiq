@@ -54,60 +54,57 @@ is enforced in the application layer.
 - `verify_all` -> **VERIFY ALL OK** (~45s)
 - FK matrix: **all deferred candidates resolved**
 
-## PHASE 1: Module 0 COMPLETE - Module 1.1 in progress
+## PHASE 1: MVP = Module 8 (AI Marketing Feedback Loop)
 
-Source of truth: `docs/backlog.md`. Execution detail: `docs/backlog-phase1.md`.
+The MVP was redefined by the owner. Landing pages, rule-based scoring and verdict
+rules are deferred; Modules 2.1/3.1/4.1/5.1/5.2 remain in the backlog as the next
+iteration.
 
-| FR | Task | State | Commit |
+**Loop:** signals -> AI diagnosis (content + channel issues) -> merchant applies
+changes manually -> new signals -> AI re-evaluation with delta.
+
+**Locked:** OpenAI + Groq behind a base provider (Groq default,
+`llama-3.3-70b-versatile`), Arabic AI output, Arabic RTL screens, 7-day windows,
+simulated signal ingestion with a shape ready for platform sync.
+
+### Module 8 tasks
+
+| FR | Task | Owner | State |
 |---|---|---|---|
-| cross-cutting | scaffold, errors, correlation, logging | accepted | `f097bbe`, `0157c5d` |
-| FR-0.1 Store data isolation | tenant context, store scoping, non-leaking 404 + security audit | accepted | `4796ed4` |
-| FR-0.2 Roles and spend approval | permission matrix + authorization service | accepted | `079b1c3` |
-| FR-0.3 Audit trail | append-only service, query, CSV export | accepted | `aca6ced` |
-| FR-0.4 Async jobs | idempotent queue, SKIP LOCKED worker, retry, status | accepted | `a375224` |
-| FR-0.5 AI governance | provenance contract, degraded mode, opt-in policy | accepted | `845696f` |
-| wiring | jobs + ai routers mounted; OpenAPI smoke test | accepted | `368a674` |
+| FR-8.1/8.5 | campaign CRUD, manual edits, config fingerprint | E4 | in progress |
+| FR-8.2 | signal ingestion | - | next |
+| FR-8.3 | AI provider abstraction (base/openai/groq/fixture) | E1 | in progress |
+| FR-8.4 | analysis schema, Arabic prompt, validation, `ai_analyses` migration | E3 | in progress |
+| FR-8.6 | re-evaluation with delta | - | after 8.4 |
+| FR-8.7 | Arabic RTL screens (campaign, signals, diagnosis) | E5 | in progress |
+| FR-8.8 | demo dataset and loop script | owner | after 8.6 |
 
-**Module 0 exit met.** 128 application tests pass; `verify_all` green.
+### Running locally (validation build, no auth)
 
-### Module 1.1 (historical import) - foundation done
-
-| Piece | State | Commit |
+| Service | URL | Notes |
 |---|---|---|
-| CSV reader + sales template | accepted | `d5c81b7` |
-| Column mapping suggestions + row validation | accepted | `ee7e8b8` |
-| Duplicate detection | accepted | `a7e518b` |
-| Preview counts + error report CSV | accepted | `012c6c2` |
-| File storage adapter | accepted | `4367433` |
+| API | http://127.0.0.1:8000 | `/health`, `/docs`; dev tenant headers `X-Store-Id`, `X-User-Id`, `X-User-Role` |
+| Web | http://localhost:3000 | Next.js, Arabic RTL |
+| DB | localhost:5432 | PostgreSQL 18 |
 
-Next: upload/create-batch API, mapping persistence, validate/preview, commit.
+The development header tenant provider is refused when `MUSAWIQ_APP_ENV=production`.
 
-## Roadmap (added, not scheduled)
+### Operational guard
 
-These modules are in `docs/backlog.md` but deliberately not started.
-
-| Module | Content | FRs | Gate |
-|---|---|---|---|
-| 0.6 Authentication & Sessions | signup, email verification, login/logout, real tenant resolution, password reset | 5 | replaces header stub |
-| 0.7 Store Onboarding | create store, resumable onboarding, store settings | 3 | needed before 1.2 in production |
-| 6 Web UI | scaffold, auth screens, onboarding, import wizard, audience, concepts, recommendations, landing pages, campaigns, dashboard, verdict/investment, a11y/RTL | 12 | framework decision |
-| 7 Deployment & Ops | environments, worker process, hosting/HTTPS, observability, backups | 5 | before launch |
-
-Current execution still follows Module 1.1 endpoints and Module 1.2.
+PostgreSQL crashed once from concurrent scratch-database creation across five
+sessions. Rule: each engineer runs only their own test folder, one command at a
+time; the owner runs `verify_all` at checkpoints.
 
 ## Team
 
-| Engineer | Session | Owns | Current |
-|---|---|---|---|
-| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | `migrations/` (frozen), `services/imports.py`, `api/routers/imports.py`, `tests/import_validation/` | FR-1.1.3 validation |
-| 2 | `ses_e8d307d33ffe7qqBWzE1U3I4Eu` | - | **aborted** (hung tool call); FR-0.1 completed by owner |
-| 3 | `ses_e8d249055fferTS2d662tFXtva` | `services/import_mapping.py`, `services/import_preview.py`, `api/routers/import_preview.py` | FR-1.1.4 preview |
-| 4 | `ses_e87eeee57ffeJVCYG3dOPI2g07` | `services/audience.py`, `api/routers/audiences.py`, `api/routers/categories.py` | FR-1.2.1/1.2.2 audience |
-| 5 | `ses_e87eeede4ffegiyAr4soulsF41` | `web/**` (Next.js) | FR-6.1 UI scaffold |
+| Engineer | Session | Current |
+|---|---|---|
+| 1 | `ses_e8d54c6beffe1mhCwZ7k6gMufO` | FR-8.3 AI providers |
+| 3 | `ses_e8d249055fferTS2d662tFXtva` | FR-8.4 analysis core + migration 0019 |
+| 4 | `ses_e87eeee57ffeJVCYG3dOPI2g07` | FR-8.1 campaign CRUD + fingerprint |
+| 5 | `ses_e87eeede4ffegiyAr4soulsF41` | FR-8.7 Arabic RTL shell + campaign/signals UI |
 
-All engineers follow `AGENTS.md`. One task per commit, explicit `git add`, no owner-file edits, acceptance-criteria-only tests.
-
-Router registration is owner-only: engineers create routers but do not edit `api/app.py`.
+Engineer 2 was aborted (hung tool call); its work was completed by the owner.
 
 ## Verification contract
 
