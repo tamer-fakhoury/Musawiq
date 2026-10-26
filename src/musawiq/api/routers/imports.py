@@ -23,6 +23,10 @@ from musawiq.db.tenant import TenantContext
 from musawiq.imports.templates import template_bytes
 from musawiq.middleware.errors import error_response
 from musawiq.repositories.base import TenantScopedRepository
+from musawiq.services.import_validation import (
+    ImportValidationError,
+    validate_import_batch,
+)
 from musawiq.services.imports import (
     MAX_UPLOAD_BYTES,
     ImportUploadError,
@@ -99,6 +103,42 @@ def list_imports(
     _: None = Depends(_require_action(Action.READ)),
 ):
     return list_import_batches(session, tenant)
+
+
+@router.post("/{batch_id}/validate")
+def validate_import(
+    batch_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    repository = TenantScopedRepository(session, "import_batches")
+    try:
+        batch = get_owned_or_404(
+            repository,
+            batch_id,
+            target_type="import_batch",
+            tenant=tenant,
+            request=request,
+        )
+    except HTTPException:
+        return error_response(
+            request,
+            status_code=404,
+            code="not_found",
+            message="Resource not found.",
+        )
+
+    try:
+        return validate_import_batch(session, tenant, batch)
+    except ImportValidationError as exc:
+        return error_response(
+            request,
+            status_code=exc.status_code,
+            code=exc.code,
+            message=exc.message,
+        )
 
 
 @router.get("/{batch_id}")
