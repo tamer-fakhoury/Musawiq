@@ -74,17 +74,31 @@ simulated signal ingestion with a shape ready for platform sync.
 | FR-8.1/8.5 | campaign CRUD, manual edits, config fingerprint | E4 | accepted | `844d905` |
 | FR-8.2 | signal ingestion + retrieval | E1 | accepted | `da9fd25` |
 | FR-8.3 | AI providers (base/openai/groq/fixture, Groq default) | E1 | accepted | `85661cf` |
-| FR-8.4a | analysis schema, Arabic prompt, validation, migration 0019 | E3 | accepted* | `1a2bbb6` |
-| FR-8.4b | analysis endpoint + persistence + rate limit | E3 | in progress | - |
-| FR-8.5b | AI copy suggestions for manual changes | E4 | in progress | - |
+| FR-8.4a | analysis schema, Arabic prompt, validation, migration 0019 | E3 | accepted | `1a2bbb6` |
+| FR-8.4b | analysis endpoint, persistence, rate limit | E3 | accepted | `1a80e23` |
+| FR-8.5b | AI copy suggestions for manual changes | E4 | accepted | `34697c2` |
 | FR-8.6a | re-evaluation delta (pure) | E4 | accepted | `e876c75` |
-| FR-8.6b | re-analysis with parent link | - | next | - |
+| FR-8.6b | re-analysis with parent link and delta | E3 | in progress | - |
 | FR-8.7a | Arabic RTL shell, campaign and signals screens | E5 | accepted | `b139ea6` |
-| FR-8.7b | Arabic AI diagnosis screen | E5 | in progress | - |
-| FR-8.8a | Arabic demo seed | E1 | in progress | - |
-| FR-8.8b | demo loop script | owner | after 8.6b | - |
+| FR-8.7b | Arabic AI diagnosis screen | E5 | accepted | `33f5f23` |
+| FR-8.7c | copy suggestions in UI + campaign form check | E5 | in progress | - |
+| FR-8.8a | Arabic demo seed | E1 | accepted | `75c1861` |
+| FR-8.8b | demo loop script | owner | accepted | `0319b4f` |
 
-`*` DB gate for migration 0019 runs once Engineer 3's analysis endpoint lands.
+### Proof of the loop (offline)
+
+```
+python -m scripts.demo_seed
+python -m scripts.demo_flow --provider fixture
+```
+
+Last run: analysis 1 `succeeded`, analysis 2 `succeeded`, delta `improved`
+(7 improved, 0 degraded, 2 flat). Report at `var/demo_report.md` (UTF-8 Arabic).
+
+The live database `musawiq` was migrated to revision `0019` and seeded with the
+demo store, concept, audience, campaign and three weak Arabic variations.
+The running API is started with `MUSAWIQ_AI_PROVIDER=fixture`; set the env var to
+`groq` (plus `MUSAWIQ_GROQ_API_KEY`) for real Arabic diagnoses.
 
 ### Running locally (validation build, no auth)
 
