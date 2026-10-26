@@ -33,6 +33,11 @@ def test_real_app_registers_every_router():
         "/audience-profiles",
         "/audience-profiles/current",
         "/audience-profiles/{profile_id}/segments",
+        "/campaigns",
+        "/campaigns/{campaign_id}",
+        "/campaigns/{campaign_id}/adsets",
+        "/campaigns/{campaign_id}/variations",
+        "/ad-variations/{variation_id}",
     }
 
     missing = expected - set(paths)

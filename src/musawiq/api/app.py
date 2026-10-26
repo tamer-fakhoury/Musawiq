@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from musawiq import __version__
 from musawiq.api.routers.ai import router as ai_router
 from musawiq.api.routers.audit import router as audit_router
+from musawiq.api.routers.campaigns import router as campaigns_router
 from musawiq.api.routers.audiences import router as audiences_router
 from musawiq.api.routers.categories import router as categories_router
 from musawiq.api.routers.health import router as health_router
@@ -83,5 +84,6 @@ def create_app(tenant_provider: TenantProvider | None = None) -> FastAPI:
     app.include_router(import_preview_router)
     app.include_router(audiences_router)
     app.include_router(categories_router)
+    app.include_router(campaigns_router)
     return app
 
