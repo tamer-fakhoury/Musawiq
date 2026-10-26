@@ -9,10 +9,17 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 
 from musawiq import __version__
+from musawiq.api.routers.ai import router as ai_router
 from musawiq.api.routers.audit import router as audit_router
 from musawiq.api.routers.health import router as health_router
+from musawiq.api.routers.jobs import router as jobs_router
 from musawiq.config import get_settings
 from musawiq.db.session import dispose_engine, get_engine
+from musawiq.middleware.tenant import (
+    DevHeaderTenantProvider,
+    TenantMiddleware,
+    TenantProvider,
+)
 
 
 @asynccontextmanager
@@ -26,20 +33,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         dispose_engine()
 
 
-def create_app() -> FastAPI:
+def create_app(tenant_provider: TenantProvider | None = None) -> FastAPI:
     """Build the application.
 
     Configuration is loaded here, not at import time, so importing this module
     never requires a database URL. Creating the app fails fast when the URL is
     missing.
+
+    ``tenant_provider`` exists so P1-A3 can replace the temporary header-based
+    development provider without changing the middleware or dependencies.
     """
     settings = get_settings()
+    provider = tenant_provider or DevHeaderTenantProvider()
+
     app = FastAPI(
         title="Musawiq API",
         version=__version__,
         lifespan=lifespan,
     )
     app.state.settings = settings
+    app.state.tenant_provider = provider
+    app.add_middleware(TenantMiddleware, provider=provider)
     app.include_router(health_router)
     app.include_router(audit_router)
+    app.include_router(jobs_router)
+    app.include_router(ai_router)
     return app
+
