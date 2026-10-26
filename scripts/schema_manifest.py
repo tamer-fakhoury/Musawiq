@@ -20,6 +20,24 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("name", "text"),
         ("is_active", "boolean"),
     ],
+    "ai_analyses": [
+        ("id", "uuid"),
+        ("store_id", "uuid"),
+        ("campaign_id", "uuid"),
+        ("parent_analysis_id", "uuid"),
+        ("window_start", "timestamptz"),
+        ("window_end", "timestamptz"),
+        ("status", "text"),
+        ("provider", "text"),
+        ("model_version", "text"),
+        ("prompt_version", "text"),
+        ("input_snapshot", "jsonb"),
+        ("result", "jsonb"),
+        ("demand_level", "text"),
+        ("confidence", "numeric"),
+        ("created_by", "uuid"),
+        ("created_at", "timestamptz"),
+    ],
     "countries": [
         ("code", "text"),
         ("name", "text"),
@@ -1086,6 +1104,7 @@ APPEND_ONLY_TABLES: set[str] = {
 
 # Tables expected to carry store_id and therefore RLS once DB-0.15 lands.
 TENANT_TABLES: set[str] = {
+    "ai_analyses",
     "store_connections",
     "ad_account_connections",
     "content_generation_jobs",
