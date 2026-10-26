@@ -79,6 +79,15 @@ Do not touch another engineer's paths. If you need a change there, report it to 
 4. Commit once, with the task ID and evidence in the body.
 5. Report: commit hash, files changed, exact command output, deviations.
 
+## Testing standard (non-negotiable)
+
+- **Tests cover acceptance criteria only.** One test per AC bullet is the target.
+- **No stress, load, timing, or performance tests.** Performance tests are added only when a real regression appears, and only for that case.
+- **No boundary/edge-case matrices, no property-based or fuzz tests, no combinatorial tables** unless the AC explicitly demands them.
+- Happy path plus one failure path per AC is enough. Stop there.
+- A task is accepted when every AC bullet is covered, not when coverage is maximal.
+
+
 ## Known debt (do not "fix" uninvited)
 
 - 82 required FK columns unindexed → DB-0.14.

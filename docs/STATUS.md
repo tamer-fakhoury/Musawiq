@@ -100,6 +100,12 @@ Application verification: `.venv\Scripts\python.exe -m pytest tests/app tests/is
 Hard checks: migrations up/down/up, parity, RLS tests, tool tests, audit tests,
 schema-doc drift, FK-matrix drift. The schema audit is soft-reporting only.
 
+**Testing standard (owner rule).** Tests cover acceptance criteria only: one test
+per AC bullet, happy path plus one failure path. No stress, load, timing,
+property-based, fuzz, or combinatorial tests. A performance test is added only
+when a real regression appears, and only for that case. Already-committed
+suites are frozen; the rule applies to all new work.
+
 CI: `.github/workflows/db.yml` runs the same command against PostgreSQL 18
 whenever a remote is configured.
 
