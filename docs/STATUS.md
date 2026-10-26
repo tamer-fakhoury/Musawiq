@@ -58,18 +58,22 @@ is enforced in the application layer.
 
 Source of truth: `docs/backlog.md` Module 0. Execution detail: `docs/backlog-phase1.md`.
 
-| FR | Atomic task | Owner | State |
-|---|---|---|---|
-| cross-cutting | P1-A1 scaffold + A1b errors/correlation/logging | Engineer 2 / 1 | in_review |
-| FR-0.1 Store data isolation | P1-A2 tenant context & store scoping | Engineer 2 | in progress |
-| FR-0.2 Roles and spend approval | P1-A3 permission matrix & authorization | Engineer 1 | in progress |
-| FR-0.3 Audit trail | P1-A4 audit service + immutable query/export | Engineer 3 | in progress |
-| FR-0.4 Async jobs, idempotency, status | P1-A5 job queue + worker lifecycle | Engineer 1 | queued |
-| FR-0.5 AI governance & degraded mode | P1-A6 provenance + degraded-mode contract | Engineer 2 | next after A2 |
-| planning | P1-B backlog gate + coverage corrections | Engineer 3 | accepted (`77e0d60`) |
+| FR | Atomic task | Owner | State | Commit |
+|---|---|---|---|---|
+| cross-cutting | P1-A1 scaffold + A1b errors/correlation/logging | E2 / E1 | accepted | `f097bbe`, `0157c5d` |
+| FR-0.1 Store data isolation | P1-A2 tenant context & store scoping | E2 | in progress | - |
+| FR-0.2 Roles and spend approval | P1-A3 permission matrix & authorization | E1 | accepted | `079b1c3` |
+| FR-0.3 Audit trail | P1-A4 audit service + query/export | E3 | accepted | `aca6ced`, `abd8f5b` |
+| FR-0.4 Async jobs, idempotency, status | P1-A5 job queue + worker lifecycle | E1 | accepted | `a375224` |
+| FR-0.5 AI governance & degraded mode | P1-A6 provenance + degraded mode | E1 | in progress | - |
+| Module 1.1 prerequisite | P1-A7 local file storage adapter | E3 | in progress | - |
+| planning | P1-B backlog gate + coverage corrections | E3 | accepted | `77e0d60` |
 
 Module 0 exits when FR-0.1 through FR-0.5 each have a passing test suite and
-`verify_all` stays green.
+`verify_all` stays green. 3 of 5 FRs are accepted; FR-0.1 and FR-0.5 are in flight.
+
+Application tests: `pytest tests/app tests/isolation tests/auth tests/audit_service tests/jobs tests/ai tests/storage -q`
+(60 passing at last run).
 
 ## Team
 
