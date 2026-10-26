@@ -1292,6 +1292,91 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 
 ---
 
+
+## Module 8 — AI Marketing Feedback Loop (current MVP, iterative)
+
+> This is the MVP we are building now. It **supersedes** the rule-based scoring
+> (2.1.3-2.1.5), landing pages (3.1) and verdict rules (5.1.3-5.1.4) for the first
+> validation build. Those modules stay in the roadmap for the next iteration.
+
+**Loop:** signals -> AI diagnosis (content and channel issues) -> suggested changes
+-> merchant applies changes manually -> new signals -> AI re-evaluation with delta.
+
+**Locked decisions:** OpenAI and Groq providers behind a base class, Groq by default
+(`llama-3.3-70b-versatile`), OpenAI `gpt-4o-mini`; all AI output in Arabic; the two
+MVP screens are Arabic RTL; default analysis window is 7 days; signals are simulated
+now but use the same `metric_snapshots` shape a real platform sync will write.
+
+### FR-8.1 Campaign, ad set, and ad content setup
+**User Story:** As a marketer, I want to define a campaign with copy so the AI has content to evaluate.
+**Acceptance Criteria:**
+- `POST /campaigns` creates a campaign for a product concept with provider, objective, budget and dates.
+- `POST /campaigns/{id}/adsets` creates targeting; `POST /campaigns/{id}/variations` creates ad copy (Arabic).
+- `PATCH /campaigns/{id}` and `PATCH /ad-variations/{id}` allow budget/targeting/copy edits.
+- All endpoints are tenant-scoped and require `write`; listing requires `read`.
+**Functional Specifications:** reuse `campaigns`, `ad_sets`, `ad_variations`; no new tables.
+
+### FR-8.2 Signal ingestion
+**User Story:** As the platform, I need performance signals in a standard shape so the AI can evaluate them.
+**Acceptance Criteria:**
+- `POST /campaigns/{id}/signals` accepts a window with per-ad metrics (impressions, reach, clicks, spend, conversions, optional engagement).
+- Values are validated (non-negative, `period_end > period_start`) and upserted into `metric_snapshots`.
+- Re-posting the same window replaces the row instead of duplicating.
+- The endpoint shape matches what a future platform sync will call; no platform code now.
+**Functional Specifications:** one row per campaign/ad set/ad and window; existing unique constraint `NULLS NOT DISTINCT` is reused.
+
+### FR-8.3 AI provider abstraction
+**User Story:** As a developer, I want interchangeable AI providers so the loop is not locked to one vendor.
+**Acceptance Criteria:**
+- `BaseProvider` defines `generate_json(system, user, schema)`, `available`, `provider`, `model_version`.
+- `OpenAIProvider` and `GroqProvider` implement it; `FixtureProvider` returns deterministic Arabic JSON for tests and offline demos.
+- `AI_PROVIDER` selects the provider; **default is `groq`**; missing key returns the degraded provider with a clear reason.
+- Keys are read from the environment, never logged, never returned by any endpoint; requests time out and are capped.
+**Functional Specifications:** `src/musawiq/ai/providers/`; no vendor SDK required (HTTP only).
+
+### FR-8.4 AI demand and issue analysis
+**User Story:** As a merchant, I want the AI to tell me what the signals mean and what is wrong.
+**Acceptance Criteria:**
+- `POST /campaigns/{id}/analyses` gathers the 7-day window, concept, audience, ad copy, budget and targeting, and calls the configured provider with a versioned prompt (`analysis-v1`).
+- Output is validated against a fixed schema and contains: demand level and rationale, content issues, channel issues, recommendations with Arabic copy-paste text, and next steps.
+- Every issue cites a metric name and an observed value that exists in the supplied signals; schema or evidence violations are rejected and stored as `failed`.
+- The analysis is persisted in `ai_analyses` with provider, model version, prompt version and input snapshot.
+- Degraded provider returns `degraded` with a clear message, never invented results.
+**Functional Specifications:** new table `ai_analyses`; `result jsonb`; Arabic text; confidence 0-1.
+
+### FR-8.5 Manual change application
+**User Story:** As a merchant, I want the recommended changes as text I can apply myself.
+**Acceptance Criteria:**
+- Each recommendation includes copyable Arabic content (`copy_paste_ar`).
+- The merchant edits the ad copy or campaign budget/targeting through the normal PATCH endpoints.
+- The system stores the campaign configuration fingerprint in the analysis input snapshot so the next analysis can detect what changed.
+- No automatic write-back to any ad platform.
+
+### FR-8.6 Re-evaluation with delta
+**User Story:** As a merchant, I want to know whether my changes improved performance.
+**Acceptance Criteria:**
+- A new analysis may reference `parent_analysis_id`.
+- The AI compares the previous and current windows and reports per-metric deltas (before, after, direction).
+- The result states whether the change improved, degraded, or did not move the demand signal, with an Arabic explanation.
+- Both analyses remain in history and are retrievable.
+
+### FR-8.7 Arabic RTL MVP screens
+**User Story:** As an Arabic-speaking merchant, I want to configure the campaign, see the signals and read the AI diagnosis.
+**Acceptance Criteria:**
+- The web app is Arabic RTL with two screens: campaign + signal entry, and AI diagnosis.
+- Recommendations are copyable with one click.
+- Previous and re-evaluated analyses are shown side by side with the delta.
+
+### FR-8.8 Demo dataset and loop script
+**User Story:** As the team, we want one command that demonstrates the whole loop.
+**Acceptance Criteria:**
+- `scripts/demo_flow.py --provider groq|openai|fixture` seeds a store, concept, audience and campaign with weak Arabic copy.
+- It ingests a poor 7-day window, runs an analysis, applies manual edits, ingests an improved window, and runs a re-analysis.
+- It prints the demand assessment, issues, recommendations and the before/after delta.
+- It works offline with `fixture` and needs no platform credentials.
+
+---
+
 ## Cross-Cutting Acceptance Criteria (apply to every task)
 
 - **CC-1** — Authorization is enforced server-side on every endpoint.
