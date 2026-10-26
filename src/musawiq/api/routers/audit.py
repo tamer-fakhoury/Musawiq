@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from musawiq.api.deps import get_session, get_tenant
 from musawiq.auth.errors import PermissionDenied
-from musawiq.auth.permissions import Action, is_allowed
+from musawiq.auth.permissions import Action
 from musawiq.auth.service import AuthorizationService
 from musawiq.db.tenant import TenantContext
 from musawiq.middleware.tenant import error_envelope, get_correlation_id
@@ -82,41 +82,11 @@ def _require_action(
     tenant: TenantContext,
     action: Action,
 ) -> None:
-    """Enforce one permission action.
-
-    Uses P1-A3's ``AuthorizationService``. The service is resolved from
-    ``app.state.authorization_service`` when a deployment installs one;
-    otherwise the default service constructed from the permission matrix is
-    used. ``PermissionDenied`` is converted to the shared error envelope.
-    """
-    service = getattr(request.app.state, "authorization_service", None)
-    if service is None:
-        service = AuthorizationService()
-
-    check = getattr(service, "check", None)
-    if check is not None:
-        try:
-            check(tenant.role, action)
-        except PermissionDenied as exc:
-            _deny(request, str(exc) or "Permission denied")
-        return
-
-    require = getattr(service, "require", None)
-    if require is not None:
-        try:
-            allowed = require(tenant, action)
-        except HTTPException:
-            raise
-        except PermissionDenied as exc:
-            _deny(request, str(exc) or "Permission denied")
-        except PermissionError as exc:
-            _deny(request, str(exc) or "Permission denied")
-        if allowed is False:
-            _deny(request)
-        return
-
-    if not is_allowed(tenant.role, action):
-        _deny(request)
+    """Enforce one permission action via the P1-A3 authorization service."""
+    try:
+        AuthorizationService().check(tenant.role, action)
+    except PermissionDenied as exc:
+        _deny(request, str(exc) or "Permission denied")
 
 
 def _filters(
@@ -215,9 +185,6 @@ def export_audit_logs(
     tenant: TenantContext = Depends(get_tenant),
     session: Session = Depends(get_session),
 ) -> StreamingResponse:
-    # Owner-only proxy: until a dedicated export action exists, require the
-    # owner-level approve_budget capability plus an explicit owner role check.
-    _require_action(request, tenant, Action.APPROVE_BUDGET)
     if tenant.role != "owner":
         _deny(request, "Audit export is restricted to the store owner")
 
@@ -247,3 +214,4 @@ def export_audit_logs(
 
 
 __all__ = ["router"]
+
