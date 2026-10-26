@@ -69,21 +69,25 @@ simulated signal ingestion with a shape ready for platform sync.
 
 ### Module 8 tasks
 
-| FR | Task | Owner | State |
-|---|---|---|---|
-| FR-8.1/8.5 | campaign CRUD, manual edits, config fingerprint | E4 | in progress |
-| FR-8.2 | signal ingestion | - | next |
-| FR-8.3 | AI provider abstraction (base/openai/groq/fixture) | E1 | in progress |
-| FR-8.4 | analysis schema, Arabic prompt, validation, `ai_analyses` migration | E3 | in progress |
-| FR-8.6 | re-evaluation with delta | - | after 8.4 |
-| FR-8.7 | Arabic RTL screens (campaign, signals, diagnosis) | E5 | in progress |
-| FR-8.8 | demo dataset and loop script | owner | after 8.6 |
+| FR | Task | Owner | State | Commit |
+|---|---|---|---|---|
+| FR-8.1/8.5 | campaign CRUD, manual edits, config fingerprint | E4 | accepted | `844d905` |
+| FR-8.2 | signal ingestion | E1 | in progress | - |
+| FR-8.3 | AI providers (base/openai/groq/fixture, Groq default) | E1 | accepted | `85661cf` |
+| FR-8.4a | analysis schema, Arabic prompt, validation, migration 0019 | E3 | accepted* | `1a2bbb6` |
+| FR-8.4b | analysis endpoint + persistence + rate limit | E3 | in progress | - |
+| FR-8.6a | re-evaluation delta (pure) | E4 | in progress | - |
+| FR-8.6b | re-analysis with parent link | - | next | - |
+| FR-8.7 | Arabic RTL screens (campaign, signals, diagnosis) | E5 | in progress | - |
+| FR-8.8 | demo dataset and loop script | owner | after 8.6 | - |
+
+`*` DB gate for migration 0019 is run at the next verification checkpoint.
 
 ### Running locally (validation build, no auth)
 
 | Service | URL | Notes |
 |---|---|---|
-| API | http://127.0.0.1:8000 | `/health`, `/docs`; dev tenant headers `X-Store-Id`, `X-User-Id`, `X-User-Role` |
+| API | http://127.0.0.1:8000 | `/health`, `/docs`; dev tenant headers `X-Store-Id`, `X-User-Id`, `X-User-Role`; AI keys use the `MUSAWIQ_` prefix |
 | Web | http://localhost:3000 | Next.js, Arabic RTL |
 | DB | localhost:5432 | PostgreSQL 18 |
 
