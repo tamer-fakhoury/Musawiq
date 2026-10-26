@@ -72,16 +72,19 @@ simulated signal ingestion with a shape ready for platform sync.
 | FR | Task | Owner | State | Commit |
 |---|---|---|---|---|
 | FR-8.1/8.5 | campaign CRUD, manual edits, config fingerprint | E4 | accepted | `844d905` |
-| FR-8.2 | signal ingestion | E1 | in progress | - |
+| FR-8.2 | signal ingestion + retrieval | E1 | accepted | `da9fd25` |
 | FR-8.3 | AI providers (base/openai/groq/fixture, Groq default) | E1 | accepted | `85661cf` |
 | FR-8.4a | analysis schema, Arabic prompt, validation, migration 0019 | E3 | accepted* | `1a2bbb6` |
 | FR-8.4b | analysis endpoint + persistence + rate limit | E3 | in progress | - |
-| FR-8.6a | re-evaluation delta (pure) | E4 | in progress | - |
+| FR-8.5b | AI copy suggestions for manual changes | E4 | in progress | - |
+| FR-8.6a | re-evaluation delta (pure) | E4 | accepted | `e876c75` |
 | FR-8.6b | re-analysis with parent link | - | next | - |
-| FR-8.7 | Arabic RTL screens (campaign, signals, diagnosis) | E5 | in progress | - |
-| FR-8.8 | demo dataset and loop script | owner | after 8.6 | - |
+| FR-8.7a | Arabic RTL shell, campaign and signals screens | E5 | accepted | `b139ea6` |
+| FR-8.7b | Arabic AI diagnosis screen | E5 | in progress | - |
+| FR-8.8a | Arabic demo seed | E1 | in progress | - |
+| FR-8.8b | demo loop script | owner | after 8.6b | - |
 
-`*` DB gate for migration 0019 is run at the next verification checkpoint.
+`*` DB gate for migration 0019 runs once Engineer 3's analysis endpoint lands.
 
 ### Running locally (validation build, no auth)
 
