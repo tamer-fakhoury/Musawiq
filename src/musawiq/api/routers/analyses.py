@@ -30,6 +30,7 @@ router = APIRouter(tags=["analyses"])
 class AnalysisRequest(BaseModel):
     window_start: datetime | None = None
     window_end: datetime | None = None
+    parent_analysis_id: uuid.UUID | None = None
 
 
 def _require_action(action: Action):
@@ -92,6 +93,9 @@ def create(
             campaign_id,
             window_start=body.window_start if body else None,
             window_end=body.window_end if body else None,
+            parent_analysis_id=(
+                body.parent_analysis_id if body else None
+            ),
             provider=_provider(request),
         )
     except (AnalysisNotFound, AnalysisRateLimited, AnalysisValidationError) as exc:

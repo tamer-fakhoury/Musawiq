@@ -33,6 +33,7 @@ class Seed:
     other_store_id: uuid.UUID
     other_user_id: uuid.UUID
     campaign_id: uuid.UUID
+    other_campaign_id: uuid.UUID
 
 
 @pytest.fixture(scope="session")
@@ -52,7 +53,8 @@ def _seed(url: str) -> Seed:
         uuid.uuid4(),
         uuid.uuid4(),
     )
-    campaign_id, adset_id, variation_id = (
+    campaign_id, other_campaign_id, adset_id, variation_id = (
+        uuid.uuid4(),
         uuid.uuid4(),
         uuid.uuid4(),
         uuid.uuid4(),
@@ -178,6 +180,29 @@ def _seed(url: str) -> Seed:
             conn.execute(
                 text(
                     """
+                    INSERT INTO campaigns (
+                        id, store_id, test_id, provider, name, objective,
+                        status, budget_type, budget_minor, currency,
+                        start_at, end_at, created_by
+                    ) VALUES (
+                        :id, :store, :test, 'meta', 'Other campaign',
+                        'conversions', 'active', 'daily', 10000, 'USD',
+                        :start, :end, :user
+                    )
+                    """
+                ),
+                {
+                    "id": other_campaign_id,
+                    "store": store_id,
+                    "test": test_id,
+                    "start": now - timedelta(days=1),
+                    "end": now + timedelta(days=7),
+                    "user": user_id,
+                },
+            )
+            conn.execute(
+                text(
+                    """
                     INSERT INTO ad_sets (
                         id, store_id, campaign_id, name, status, targeting,
                         budget_type, budget_minor, currency, start_at, end_at
@@ -274,6 +299,7 @@ def _seed(url: str) -> Seed:
         other_store_id=other_store_id,
         other_user_id=other_user_id,
         campaign_id=campaign_id,
+        other_campaign_id=other_campaign_id,
     )
 
 

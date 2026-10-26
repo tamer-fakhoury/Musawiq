@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from musawiq.ai.analysis.delta import compute_delta, summarize_delta
 from musawiq.ai.analysis.prompt import PROMPT_VERSION, SYSTEM_PROMPT
 from musawiq.ai.analysis.schema import AnalysisResult
 from musawiq.ai.providers import get_provider
@@ -108,6 +109,33 @@ def _campaign(
     ).mappings().one_or_none()
     if row is None:
         raise AnalysisNotFound("Campaign not found")
+    return row
+
+
+def _parent_analysis(
+    session: Session,
+    tenant: TenantContext,
+    campaign_id: uuid.UUID | str,
+    parent_analysis_id: uuid.UUID | str | None,
+) -> Mapping[str, Any] | None:
+    if parent_analysis_id is None:
+        return None
+    row = session.execute(
+        text(
+            """
+            SELECT id, campaign_id, input_snapshot
+            FROM ai_analyses
+            WHERE id = :id AND store_id = :store_id
+            """
+        ),
+        {"id": parent_analysis_id, "store_id": tenant.store_id},
+    ).mappings().one_or_none()
+    if row is None:
+        raise AnalysisNotFound("Parent analysis not found")
+    if str(row["campaign_id"]) != str(campaign_id):
+        raise AnalysisValidationError(
+            "parent analysis belongs to another campaign"
+        )
     return row
 
 
@@ -347,6 +375,7 @@ def _persist(
     provider: Any,
     snapshot: dict[str, Any],
     result: dict[str, Any] | None,
+    parent_analysis_id: uuid.UUID | str | None = None,
     demand_level: str | None = None,
     confidence: float | None = None,
 ) -> Mapping[str, Any]:
@@ -354,13 +383,14 @@ def _persist(
         text(
             """
             INSERT INTO ai_analyses (
-                store_id, campaign_id, window_start, window_end, status,
-                provider, model_version, prompt_version, input_snapshot,
-                result, demand_level, confidence, created_by
+                store_id, campaign_id, parent_analysis_id, window_start,
+                window_end, status, provider, model_version, prompt_version,
+                input_snapshot, result, demand_level, confidence, created_by
             ) VALUES (
-                :store_id, :campaign_id, :window_start, :window_end, :status,
-                :provider, :model_version, :prompt_version, :input_snapshot,
-                :result, :demand_level, :confidence, :created_by
+                :store_id, :campaign_id, :parent_analysis_id, :window_start,
+                :window_end, :status, :provider, :model_version,
+                :prompt_version, :input_snapshot, :result, :demand_level,
+                :confidence, :created_by
             )
             RETURNING *
             """
@@ -368,6 +398,7 @@ def _persist(
         {
             "store_id": tenant.store_id,
             "campaign_id": campaign_id,
+            "parent_analysis_id": parent_analysis_id,
             "window_start": start,
             "window_end": end,
             "status": status,
@@ -409,6 +440,7 @@ def create_analysis(
     *,
     window_start: datetime | None = None,
     window_end: datetime | None = None,
+    parent_analysis_id: uuid.UUID | str | None = None,
     provider: Any = None,
 ) -> dict[str, Any]:
     campaign = _campaign(session, tenant, campaign_id)
@@ -421,11 +453,28 @@ def create_analysis(
             "window_start must be before window_end"
         )
 
+    parent = _parent_analysis(
+        session, tenant, campaign_id, parent_analysis_id
+    )
     provider = provider or get_provider()
     snapshot = _snapshot(
         session, tenant, campaign_id, campaign, start, end
     )
     supplied_metrics = snapshot["signals"]["totals"]
+    parent_id = parent["id"] if parent is not None else None
+
+    delta_payload = None
+    prompt_context = dict(snapshot)
+    if parent is not None:
+        parent_totals = (
+            (parent["input_snapshot"] or {}).get("signals") or {}
+        ).get("totals") or {}
+        delta_rows = compute_delta(parent_totals, supplied_metrics)
+        delta_payload = {
+            "metrics": delta_rows,
+            "summary": summarize_delta(delta_rows),
+        }
+        prompt_context["delta"] = delta_payload
 
     if getattr(provider, "available", True) is False:
         reason = _degraded_reason(provider)
@@ -439,12 +488,13 @@ def create_analysis(
             provider=provider,
             snapshot=snapshot,
             result={"degraded_reason": reason},
+            parent_analysis_id=parent_id,
         )
         return _analysis_out(row)
 
     user_prompt = (
         "Analyse this campaign data and return the JSON object now:\n"
-        + json.dumps(snapshot, ensure_ascii=False, sort_keys=True)
+        + json.dumps(prompt_context, ensure_ascii=False, sort_keys=True)
     )
     try:
         payload = provider.generate_json(
@@ -464,6 +514,7 @@ def create_analysis(
             provider=provider,
             snapshot=snapshot,
             result={"error": reason},
+            parent_analysis_id=parent_id,
         )
         raise AnalysisValidationError(reason) from exc
 
@@ -480,9 +531,12 @@ def create_analysis(
             provider=provider,
             snapshot=snapshot,
             result={"error": str(exc)},
+            parent_analysis_id=parent_id,
         )
         raise
 
+    result_data = result.model_dump(mode="json")
+    result_data["delta"] = delta_payload
     row = _persist(
         session,
         tenant,
@@ -492,7 +546,8 @@ def create_analysis(
         status="succeeded",
         provider=provider,
         snapshot=snapshot,
-        result=result.model_dump(mode="json"),
+        result=result_data,
+        parent_analysis_id=parent_id,
         demand_level=result.demand.level,
         confidence=result.demand.confidence,
     )
