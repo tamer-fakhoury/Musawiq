@@ -19,6 +19,7 @@ from musawiq.api.routers.health import router as health_router
 from musawiq.api.routers.import_preview import router as import_preview_router
 from musawiq.api.routers.imports import router as imports_router
 from musawiq.api.routers.jobs import router as jobs_router
+from musawiq.api.routers.signals import router as signals_router
 from musawiq.config import ConfigurationError, get_settings
 from musawiq.db.session import dispose_engine, get_engine
 from musawiq.middleware.tenant import (
@@ -85,5 +86,6 @@ def create_app(tenant_provider: TenantProvider | None = None) -> FastAPI:
     app.include_router(audiences_router)
     app.include_router(categories_router)
     app.include_router(campaigns_router)
+    app.include_router(signals_router)
     return app
 

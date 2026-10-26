@@ -37,6 +37,7 @@ def test_real_app_registers_every_router():
         "/campaigns/{campaign_id}",
         "/campaigns/{campaign_id}/adsets",
         "/campaigns/{campaign_id}/variations",
+        "/campaigns/{campaign_id}/signals",
         "/ad-variations/{variation_id}",
     }
 
