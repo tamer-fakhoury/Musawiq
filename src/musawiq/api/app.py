@@ -12,6 +12,7 @@ from musawiq import __version__
 from musawiq.api.routers.ai import router as ai_router
 from musawiq.api.routers.audit import router as audit_router
 from musawiq.api.routers.health import router as health_router
+from musawiq.api.routers.imports import router as imports_router
 from musawiq.api.routers.jobs import router as jobs_router
 from musawiq.config import get_settings
 from musawiq.db.session import dispose_engine, get_engine
@@ -58,5 +59,6 @@ def create_app(tenant_provider: TenantProvider | None = None) -> FastAPI:
     app.include_router(audit_router)
     app.include_router(jobs_router)
     app.include_router(ai_router)
+    app.include_router(imports_router)
     return app
 
