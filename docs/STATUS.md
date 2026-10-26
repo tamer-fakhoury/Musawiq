@@ -54,31 +54,33 @@ is enforced in the application layer.
 - `verify_all` -> **VERIFY ALL OK** (~45s)
 - FK matrix: **all deferred candidates resolved**
 
-## PHASE 1: IN PROGRESS - Module 0 (Platform Foundations)
+## PHASE 1: Module 0 COMPLETE - Module 1.1 in progress
 
-Source of truth: `docs/backlog.md` Module 0. Execution detail: `docs/backlog-phase1.md`.
+Source of truth: `docs/backlog.md`. Execution detail: `docs/backlog-phase1.md`.
 
-| FR | Atomic task | Owner | State | Commit |
-|---|---|---|---|---|
-| cross-cutting | P1-A1 scaffold + A1b errors/correlation/logging | E2 / E1 | accepted | `f097bbe`, `0157c5d` |
-| FR-0.1 Store data isolation | P1-A2 tenant context & store scoping | E2 | in progress | - |
-| FR-0.2 Roles and spend approval | P1-A3 permission matrix & authorization | E1 | accepted | `079b1c3` |
-| FR-0.3 Audit trail | P1-A4 audit service + query/export | E3 | accepted | `aca6ced`, `abd8f5b` |
-| FR-0.4 Async jobs, idempotency, status | P1-A5 job queue + worker lifecycle | E1 | accepted | `a375224` |
-| FR-0.5 AI governance & degraded mode | P1-A6 provenance + degraded mode | E1 | accepted* | `845696f` |
-| Module 1.1 prerequisite | P1-A7 local file storage adapter | E3 | accepted | `4367433` |
-| integration | register `jobs` + `ai` routers in `create_app` | E2 | in progress | - |
+| FR | Task | State | Commit |
+|---|---|---|---|
+| cross-cutting | scaffold, errors, correlation, logging | accepted | `f097bbe`, `0157c5d` |
+| FR-0.1 Store data isolation | tenant context, store scoping, non-leaking 404 + security audit | accepted | `4796ed4` |
+| FR-0.2 Roles and spend approval | permission matrix + authorization service | accepted | `079b1c3` |
+| FR-0.3 Audit trail | append-only service, query, CSV export | accepted | `aca6ced` |
+| FR-0.4 Async jobs | idempotent queue, SKIP LOCKED worker, retry, status | accepted | `a375224` |
+| FR-0.5 AI governance | provenance contract, degraded mode, opt-in policy | accepted | `845696f` |
+| wiring | jobs + ai routers mounted; OpenAPI smoke test | accepted | `368a674` |
 
-`*` FR-0.5 accepted pending router wiring: `ai.py` and `jobs.py` exist and are
-tested against a locally-built app, but `create_app` does not include them yet.
-Engineer 2 adds the two `include_router` lines plus a route smoke test.
-| planning | P1-B backlog gate + coverage corrections | E3 | accepted | `77e0d60` |
+**Module 0 exit met.** 128 application tests pass; `verify_all` green.
 
-Module 0 exits when FR-0.1 through FR-0.5 each have a passing test suite and
-`verify_all` stays green. 3 of 5 FRs are accepted; FR-0.1 and FR-0.5 are in flight.
+### Module 1.1 (historical import) - foundation done
 
-Application tests: `pytest tests/app tests/isolation tests/auth tests/audit_service tests/jobs tests/ai tests/storage -q`
-(81 passing at last run).
+| Piece | State | Commit |
+|---|---|---|
+| CSV reader + sales template | accepted | `d5c81b7` |
+| Column mapping suggestions + row validation | accepted | `ee7e8b8` |
+| Duplicate detection | accepted | `a7e518b` |
+| Preview counts + error report CSV | accepted | `012c6c2` |
+| File storage adapter | accepted | `4367433` |
+
+Next: upload/create-batch API, mapping persistence, validate/preview, commit.
 
 ## Team
 
