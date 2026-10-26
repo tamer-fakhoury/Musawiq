@@ -38,6 +38,13 @@ class Settings(BaseSettings):
         default="http://localhost:3000,http://127.0.0.1:3000",
         min_length=1,
     )
+    ai_provider: str = Field(default="groq", min_length=1)
+    groq_api_key: str | None = Field(default=None)
+    groq_model: str = Field(
+        default="llama-3.3-70b-versatile", min_length=1
+    )
+    openai_api_key: str | None = Field(default=None)
+    openai_model: str = Field(default="gpt-4o-mini", min_length=1)
 
     @property
     def cors_origin_list(self) -> list[str]:
