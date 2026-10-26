@@ -53,4 +53,6 @@ rebuild) after changing them. Every API call sends the demo tenant headers
   variations.
 - `/campaigns/{id}/signals` — submit a seven-day metrics window per ad and view
   previously submitted windows.
+- `/campaigns/{id}/analysis` — run an AI diagnosis, copy recommendations, and
+  review previous analyses.
 - `/health` — reports `ok`, `degraded`, or `unreachable` for the API.

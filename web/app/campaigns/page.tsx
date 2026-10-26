@@ -356,6 +356,20 @@ export default function CampaignsPage() {
                   <p className="mt-1 text-sm text-zinc-600">
                     الهدف: {detail.objective}
                   </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                      href={`/campaigns/${detail.id}/signals`}
+                      className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+                    >
+                      تسجيل الإشارات
+                    </Link>
+                    <Link
+                      href={`/campaigns/${detail.id}/analysis`}
+                      className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white"
+                    >
+                      تحليل الإشارات
+                    </Link>
+                  </div>
                 </div>
 
                 <div>
