@@ -1,0 +1,202 @@
+"""Campaign, ad set, and ad variation endpoints."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Any, Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from musawiq.api.deps import get_session, get_tenant
+from musawiq.auth.permissions import Action
+from musawiq.auth.service import AuthorizationService
+from musawiq.db.tenant import TenantContext
+from musawiq.services.campaigns import (
+    CampaignError,
+    CampaignNotFound,
+    CampaignValidationError,
+    create_adset,
+    create_campaign,
+    create_variation,
+    get_campaign,
+    list_campaigns,
+    update_campaign,
+    update_variation,
+)
+
+router = APIRouter(tags=["campaigns"])
+
+
+class CreateCampaignRequest(BaseModel):
+    test_id: uuid.UUID | None = None
+    provider: str
+    name: str = Field(min_length=1)
+    objective: str = Field(min_length=1)
+    budget_type: Literal["daily", "total"]
+    budget_minor: int
+    currency: str = Field(min_length=3, max_length=3)
+    start_at: datetime
+    end_at: datetime
+
+
+class UpdateCampaignRequest(BaseModel):
+    name: str | None = None
+    budget_type: Literal["daily", "total"] | None = None
+    budget_minor: int | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    status: Literal["draft", "active", "paused"] | None = None
+
+
+class CreateAdSetRequest(BaseModel):
+    name: str = Field(min_length=1)
+    targeting: dict[str, Any]
+    budget_type: Literal["daily", "total"] | None = None
+    budget_minor: int | None = None
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+
+
+class CreateVariationRequest(BaseModel):
+    adset_id: uuid.UUID
+    copy_text: str = Field(min_length=1)
+    headline: str | None = None
+    description: str | None = None
+    post_id: uuid.UUID | None = None
+    destination_url: str | None = None
+
+
+class UpdateVariationRequest(BaseModel):
+    copy_text: str | None = None
+    headline: str | None = None
+    description: str | None = None
+    status: Literal["draft", "approved", "discarded"] | None = None
+
+
+def _require_action(action: Action):
+    def dependency(request: Request) -> None:
+        tenant = getattr(request.state, "tenant", None)
+        role = getattr(tenant, "role", None) or getattr(
+            request.state, "role", None
+        )
+        AuthorizationService().check(role, action)
+
+    return dependency
+
+
+def _raise_for(exc: CampaignError) -> None:
+    if isinstance(exc, CampaignNotFound):
+        raise HTTPException(status_code=404, detail="Resource not found")
+    if isinstance(exc, CampaignValidationError):
+        raise HTTPException(status_code=422, detail=str(exc))
+    raise exc
+
+
+@router.post("/campaigns", status_code=201)
+def create(
+    body: CreateCampaignRequest,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        return create_campaign(session, tenant, body.model_dump())
+    except CampaignError as exc:
+        _raise_for(exc)
+
+
+@router.get("/campaigns")
+def list_all(
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    return list_campaigns(session, tenant)
+
+
+@router.get("/campaigns/{campaign_id}")
+def detail(
+    campaign_id: uuid.UUID,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    try:
+        return get_campaign(session, tenant, campaign_id)
+    except CampaignError as exc:
+        _raise_for(exc)
+
+
+@router.patch("/campaigns/{campaign_id}")
+def patch(
+    campaign_id: uuid.UUID,
+    body: UpdateCampaignRequest,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        return update_campaign(
+            session,
+            tenant,
+            campaign_id,
+            body.model_dump(exclude_unset=True),
+        )
+    except CampaignError as exc:
+        _raise_for(exc)
+
+
+@router.post("/campaigns/{campaign_id}/adsets", status_code=201)
+def create_ad_set(
+    campaign_id: uuid.UUID,
+    body: CreateAdSetRequest,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        return create_adset(session, tenant, campaign_id, body.model_dump())
+    except CampaignError as exc:
+        _raise_for(exc)
+
+
+@router.post("/campaigns/{campaign_id}/variations", status_code=201)
+def create_ad_variation(
+    campaign_id: uuid.UUID,
+    body: CreateVariationRequest,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        return create_variation(
+            session, tenant, campaign_id, body.model_dump()
+        )
+    except CampaignError as exc:
+        _raise_for(exc)
+
+
+@router.patch("/ad-variations/{variation_id}")
+def patch_ad_variation(
+    variation_id: uuid.UUID,
+    body: UpdateVariationRequest,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        return update_variation(
+            session,
+            tenant,
+            variation_id,
+            body.model_dump(exclude_unset=True),
+        )
+    except CampaignError as exc:
+        _raise_for(exc)
+
+
+__all__ = ["router"]
