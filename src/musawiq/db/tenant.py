@@ -1,8 +1,8 @@
 """Tenant context and transaction-local tenant settings.
 
 The application sets ``app.store_id`` and ``app.user_id`` with ``SET LOCAL`` so
-the values expire with the current transaction. DB-0.15 will use the same
-settings in RLS policies; wiring them now keeps the application contract stable.
+the values expire with the current transaction. The DB-0.15 forced RLS policies
+read the same settings; the Python context mirrors them for repositories.
 """
 
 from __future__ import annotations
@@ -15,13 +15,21 @@ from sqlalchemy.orm import Session
 
 
 class TenantContextError(RuntimeError):
-    """Raised when code tries to use a repository without a tenant context."""
+    """Base class for tenant-context contract violations."""
+
+
+class TenantContextMissing(TenantContextError):
+    """Raised when a tenant-scoped query has no active tenant context."""
+
+
+ROLES = frozenset({"owner", "manager", "analyst"})
 
 
 @dataclass(frozen=True)
 class TenantContext:
     store_id: uuid.UUID
     user_id: uuid.UUID
+    role: str = "analyst"
 
 
 def _coerce_uuid(value: object, name: str) -> uuid.UUID:
@@ -35,6 +43,7 @@ def set_local_tenant(
     session: Session,
     store_id: uuid.UUID | str,
     user_id: uuid.UUID | str,
+    role: str = "analyst",
 ) -> TenantContext:
     """Set the transaction-local tenant settings and return the context.
 
@@ -44,11 +53,18 @@ def set_local_tenant(
     """
     store_uuid = _coerce_uuid(store_id, "store_id")
     user_uuid = _coerce_uuid(user_id, "user_id")
+    normalized_role = role.strip().lower()
+    if normalized_role not in ROLES:
+        raise ValueError(f"role must be one of {sorted(ROLES)}")
 
     session.execute(text(f"SET LOCAL app.store_id = '{store_uuid}'"))
     session.execute(text(f"SET LOCAL app.user_id = '{user_uuid}'"))
 
-    context = TenantContext(store_id=store_uuid, user_id=user_uuid)
+    context = TenantContext(
+        store_id=store_uuid,
+        user_id=user_uuid,
+        role=normalized_role,
+    )
     session.info["tenant"] = context
     return context
 
@@ -56,7 +72,7 @@ def set_local_tenant(
 def get_tenant(session: Session) -> TenantContext:
     context = session.info.get("tenant")
     if not isinstance(context, TenantContext):
-        raise TenantContextError(
+        raise TenantContextMissing(
             "Tenant context is not set; call "
             "set_local_tenant(session, store_id, user_id) inside the current "
             "transaction before using a tenant-scoped repository"

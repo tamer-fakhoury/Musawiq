@@ -2,7 +2,7 @@
 
 There are no ORM models yet. The repository knows a table name and always adds
 ``store_id = <tenant>`` to every statement. Constructing or using it without a
-tenant context raises ``TenantContextError`` before any SQL is built.
+tenant context raises ``TenantContextMissing`` before any SQL is built.
 """
 
 from __future__ import annotations
@@ -125,6 +125,31 @@ class TenantScopedRepository:
             .mappings()
             .one_or_none()
         )
+
+    def exists_in_other_store(self, record_id: uuid.UUID | str) -> bool:
+        """Return whether the id exists outside the active tenant.
+
+        This is a security-audit probe only: it returns a boolean and never
+        exposes the other row. PostgreSQL RLS still hides the row from a
+        least-privilege application role; in that case the caller reports 404
+        without an existence leak. A privileged test/session can observe the
+        boolean and trigger the security audit path.
+        """
+        tenant = self._tenant()
+        record_uuid = _coerce_uuid(record_id, "id")
+        sql = (
+            f"SELECT id FROM {self._table_sql} "
+            "WHERE id = :id AND store_id <> :tenant_store_id LIMIT 1"
+        )
+        row = (
+            self.session.execute(
+                text(sql),
+                {"id": record_uuid, "tenant_store_id": tenant.store_id},
+            )
+            .mappings()
+            .first()
+        )
+        return row is not None
 
     def insert(self, values: Mapping[str, Any]) -> Mapping[str, Any]:
         tenant = self._tenant()
