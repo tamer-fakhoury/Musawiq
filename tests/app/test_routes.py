@@ -22,6 +22,17 @@ def test_real_app_registers_every_router():
         "/jobs/{job_id}/retry",
         "/ai/status",
         "/ai/generate",
+        "/imports",
+        "/imports/template.csv",
+        "/imports/{batch_id}",
+        "/imports/{batch_id}/validate",
+        "/imports/{batch_id}/preview",
+        "/imports/{batch_id}/error-report.csv",
+        "/categories",
+        "/niches",
+        "/audience-profiles",
+        "/audience-profiles/current",
+        "/audience-profiles/{profile_id}/segments",
     }
 
     missing = expected - set(paths)

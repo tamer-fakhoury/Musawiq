@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     database_url: str = Field(..., min_length=1)
     app_env: str = Field(default="development", min_length=1)
     log_level: str = Field(default="INFO", min_length=1)
+    cors_origins: str = Field(
+        default="http://localhost:3000,http://127.0.0.1:3000",
+        min_length=1,
+    )
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
 
     @field_validator("app_env")
     @classmethod
