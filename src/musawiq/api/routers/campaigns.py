@@ -10,10 +10,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from musawiq.ai.providers import get_provider
 from musawiq.api.deps import get_session, get_tenant
 from musawiq.auth.permissions import Action
 from musawiq.auth.service import AuthorizationService
 from musawiq.db.tenant import TenantContext
+from musawiq.middleware.errors import error_response
 from musawiq.services.campaigns import (
     CampaignError,
     CampaignNotFound,
@@ -25,6 +27,13 @@ from musawiq.services.campaigns import (
     list_campaigns,
     update_campaign,
     update_variation,
+)
+from musawiq.services.copy import (
+    CopyNotFound,
+    CopyProviderError,
+    CopyUnavailable,
+    CopyValidationError,
+    suggest_copy,
 )
 
 router = APIRouter(tags=["campaigns"])
@@ -77,6 +86,12 @@ class UpdateVariationRequest(BaseModel):
     status: Literal["draft", "approved", "discarded"] | None = None
 
 
+class SuggestCopyRequest(BaseModel):
+    adset_id: uuid.UUID | None = None
+    count: int = Field(default=3, ge=1, le=5)
+    notes: str | None = None
+
+
 def _require_action(action: Action):
     def dependency(request: Request) -> None:
         tenant = getattr(request.state, "tenant", None)
@@ -94,6 +109,43 @@ def _raise_for(exc: CampaignError) -> None:
     if isinstance(exc, CampaignValidationError):
         raise HTTPException(status_code=422, detail=str(exc))
     raise exc
+
+
+def _provider(request: Request):
+    injected = getattr(request.app.state, "ai_provider", None)
+    if injected is not None:
+        return injected
+    return get_provider(request.app.state.settings)
+
+
+def _copy_error(request: Request, exc: Exception):
+    if isinstance(exc, CopyNotFound):
+        return error_response(
+            request,
+            status_code=404,
+            code="not_found",
+            message="Resource not found.",
+        )
+    if isinstance(exc, CopyUnavailable):
+        return error_response(
+            request,
+            status_code=503,
+            code="ai_unavailable",
+            message=str(exc) or "The AI provider is unavailable.",
+        )
+    if isinstance(exc, CopyProviderError):
+        return error_response(
+            request,
+            status_code=502,
+            code="ai_invalid_output",
+            message=str(exc) or "The AI provider returned invalid output.",
+        )
+    return error_response(
+        request,
+        status_code=422,
+        code="validation_error",
+        message=str(exc) or "Request validation failed.",
+    )
 
 
 @router.post("/campaigns", status_code=201)
@@ -197,6 +249,35 @@ def patch_ad_variation(
         )
     except CampaignError as exc:
         _raise_for(exc)
+
+
+@router.post("/campaigns/{campaign_id}/variations/suggest")
+def suggest_variations(
+    campaign_id: uuid.UUID,
+    request: Request,
+    body: SuggestCopyRequest | None = None,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    payload = body or SuggestCopyRequest()
+    try:
+        return suggest_copy(
+            session,
+            tenant,
+            campaign_id,
+            adset_id=payload.adset_id,
+            count=payload.count,
+            notes=payload.notes,
+            provider=_provider(request),
+        )
+    except (
+        CopyNotFound,
+        CopyUnavailable,
+        CopyProviderError,
+        CopyValidationError,
+    ) as exc:
+        return _copy_error(request, exc)
 
 
 __all__ = ["router"]
