@@ -82,6 +82,19 @@ Source of truth: `docs/backlog.md`. Execution detail: `docs/backlog-phase1.md`.
 
 Next: upload/create-batch API, mapping persistence, validate/preview, commit.
 
+## Roadmap (added, not scheduled)
+
+These modules are in `docs/backlog.md` but deliberately not started.
+
+| Module | Content | FRs | Gate |
+|---|---|---|---|
+| 0.6 Authentication & Sessions | signup, email verification, login/logout, real tenant resolution, password reset | 5 | replaces header stub |
+| 0.7 Store Onboarding | create store, resumable onboarding, store settings | 3 | needed before 1.2 in production |
+| 6 Web UI | scaffold, auth screens, onboarding, import wizard, audience, concepts, recommendations, landing pages, campaigns, dashboard, verdict/investment, a11y/RTL | 12 | framework decision |
+| 7 Deployment & Ops | environments, worker process, hosting/HTTPS, observability, backups | 5 | before launch |
+
+Current execution still follows Module 1.1 endpoints and Module 1.2.
+
 ## Team
 
 | Engineer | Session | Owns |

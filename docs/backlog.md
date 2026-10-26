@@ -1132,6 +1132,166 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
   - Acceptance/dismissal audited with actor and before/after status.
 - **Notes:** Deferred from MVP: FR-4.2.6 automated execution, FR-4.2.7 kill switch execution paths. `OptimizationAction` and `BudgetPolicy` entities exist for Phase 2.
 
+
+## Module 0.6 — Authentication & Sessions (P0, roadmap)
+
+> Roadmap only. Not scheduled until the owner releases it.
+> Replaces the temporary `X-Store-Id` / `X-User-Id` developer provider with real security.
+
+### FR-0.6.1 Sign up
+**User Story:** As a new merchant, I want to create an account so I can use the platform.
+**Acceptance Criteria:**
+- `POST /auth/signup` accepts email + password and creates a `users` row (email stored as `citext`).
+- Password is hashed with argon2id; minimum 12 characters; no password is ever logged or returned.
+- Duplicate email returns `409` with a generic message that does not reveal account existence.
+- Success returns `201` and queues a verification email; the user is **not** logged in yet.
+**Functional Specifications:** `auth/signup.py`; reuse `users` table; password hashing dependency added once. **Notes:** no auto-login before verification.
+
+### FR-0.6.2 Email verification
+**User Story:** As a new merchant, I want to verify my email so my account is trusted.
+**Acceptance Criteria:**
+- `GET /auth/verify?token=...` verifies a single-use token, valid for 24h, stored hashed.
+- Login is refused with `403 email_unverified` until verified.
+- `POST /auth/verify/resend` is rate-limited to 3 requests per hour per email.
+**Functional Specifications:** token = random 32 bytes, SHA-256 stored in a small `email_verification_tokens` table or a `users` metadata column; either is acceptable, one migration.
+
+### FR-0.6.3 Login, logout, session
+**User Story:** As a user, I want to sign in and stay signed in safely.
+**Acceptance Criteria:**
+- `POST /auth/login` sets an HttpOnly, Secure, SameSite=Lax signed session cookie (7-day expiry); returns the user and active store.
+- Invalid credentials return a generic `401`, never revealing which field was wrong.
+- Five consecutive failures for an email within 15 minutes return `429` for 15 minutes.
+- `POST /auth/logout` clears the cookie.
+**Functional Specifications:** stateless signed cookie (itsdangerous) — no session table. Revocation on password change is deferred to hardening.
+
+### FR-0.6.4 Real tenant resolution
+**User Story:** As the platform, I need authenticated identity, not headers.
+**Acceptance Criteria:**
+- The cookie session replaces `DevHeaderTenantProvider`; unauthenticated requests to protected routes return `401`.
+- The resolved context carries `user_id`, `store_id`, and `role` from the database.
+- State-changing cookie-authenticated requests require a CSRF token; missing/invalid token returns `403`.
+**Functional Specifications:** new `SessionTenantProvider`; keep the `TenantProvider` protocol so middleware and dependencies do not change.
+
+### FR-0.6.5 Password reset
+**User Story:** As a user who forgot the password, I want to reset it.
+**Acceptance Criteria:**
+- `POST /auth/password/forgot` always returns `202` (no account enumeration).
+- Reset token is single-use and expires in 1 hour.
+- `POST /auth/password/reset` sets a new password and invalidates the current session cookie.
+**Functional Specifications:** same token table as verification, purpose-scoped.
+
+---
+
+## Module 0.7 — Store Onboarding (P0, roadmap)
+
+> Roadmap only. Required before Module 1.2 can be used by a real merchant.
+
+### FR-0.7.1 Create store
+**User Story:** As a verified user, I want to create my store so I can start testing products.
+**Acceptance Criteria:**
+- `POST /stores` creates exactly one store per owner (MVP), with a slugified unique `slug`.
+- `default_currency`, `default_language`, `country_code`, and `timezone` are validated against reference data.
+- Created store starts with `onboarding_status = 'in_progress'`.
+**Functional Specifications:** writes `stores`; the `owner_user_id` unique constraint already enforces one store.
+
+### FR-0.7.2 Onboarding progress
+**User Story:** As a new user, I want to resume onboarding where I left off.
+**Acceptance Criteria:**
+- `GET /stores/{id}/onboarding` returns the current step and status.
+- `PATCH /stores/{id}/onboarding` advances or completes onboarding.
+- Completion requires at least one category/niche and one audience profile.
+**Functional Specifications:** `stores.onboarding_status` plus a small step value in `stores.settings`; no new table.
+
+### FR-0.7.3 Store profile settings
+**User Story:** As an owner, I want to update my store profile.
+**Acceptance Criteria:**
+- `PATCH /stores/{id}` updates name, slug, currency, language, and timezone for Owner/Manager only.
+- Invalid currency/language/country codes return `422` with field errors.
+- Slug conflicts return `409`.
+**Functional Specifications:** reuse the store owner authorization action.
+
+---
+
+
+## Module 6 — Web UI (P0, roadmap)
+
+> Roadmap only. Framework decision required before the first UI task starts.
+
+### FR-6.1 Frontend scaffold and design baseline
+**User Story:** As a developer, I want a working frontend shell so feature screens can be built.
+**Acceptance Criteria:**
+- App shell with routing, layout, and a typed API client against the backend base URL.
+- Shared error and loading states; environment-based API URL.
+- Builds and lints clean; one smoke test renders the shell.
+**Functional Specifications:** `web/` package; no state library until a second need appears.
+
+### FR-6.2 Authentication screens
+**User Story:** As a merchant, I can sign up, verify, log in, and log out from the UI.
+**Acceptance Criteria:** all four flows work against FR-0.6; validation errors are shown inline; unverified login shows a resend action.
+
+### FR-6.3 Onboarding wizard
+**User Story:** As a new user, I complete store setup in a guided flow.
+**Acceptance Criteria:** store creation, category/niche, audience profile, and completion step are resumable; progress is visible.
+
+### FR-6.4 Import wizard
+**User Story:** As a merchant, I upload and map my sales CSV in the browser.
+**Acceptance Criteria:** upload, auto-suggested mapping with editable selectors, preview counts, error download, and commit summary.
+
+### FR-6.5 Audience screens
+**User Story:** As an analyst, I manage my audience profile and segments.
+**Acceptance Criteria:** create/edit segments, version history visible, feedback intake.
+
+### FR-6.6 Concept evaluation screens
+**User Story:** As a brand owner, I create and compare product concepts.
+**Acceptance Criteria:** concept form with live margin, score card with top factors, side-by-side comparison, selection to test.
+
+### FR-6.7 Recommendations library
+**User Story:** As a merchant, I browse, save, dismiss, and convert AI ideas.
+**Acceptance Criteria:** verified vs hypothesis evidence visually distinct; AI-generated label shown; convert flow pre-fills a concept.
+
+### FR-6.8 Landing page builder
+**User Story:** As a seller, I generate, edit, preview, and publish a product page.
+**Acceptance Criteria:** desktop/mobile preview, copy editing, WhatsApp/COD selection, publish confirmation and live URL.
+
+### FR-6.9 Campaign and ad variations
+**User Story:** As a marketer, I curate ads and configure a campaign.
+**Acceptance Criteria:** variation approve/discard, pre-flight checklist, publish status with platform errors.
+
+### FR-6.10 Tracking dashboard
+**User Story:** As a merchant, I see visits, clicks, orders, and attribution coverage.
+**Acceptance Criteria:** product/campaign filters, numerator/denominator on every rate, data freshness shown.
+
+### FR-6.11 Verdict and investment screens
+**User Story:** As an owner, I review the Go/No-Go verdict and quantity scenarios.
+**Acceptance Criteria:** verdict with met/missed thresholds and limitations; scenario comparison with risk labels; recalculation versioning.
+
+### FR-6.12 Accessibility, i18n, and RTL pass
+**User Story:** As a merchant in an RTL market, I use the product comfortably.
+**Acceptance Criteria:** WCAG 2.1 AA baseline on core flows; Arabic RTL layout; locale-aware dates/currency.
+
+---
+
+## Module 7 — Deployment & Operations (P1, roadmap)
+
+> Roadmap only.
+
+### FR-7.1 Environments and configuration
+**Acceptance Criteria:** dev/staging/production configs, secrets from environment, no secrets in the repo.
+
+### FR-7.2 Background worker process
+**Acceptance Criteria:** the job worker runs as a separate supervised process; restarts resume queued jobs.
+
+### FR-7.3 Hosting, HTTPS, and public pages
+**Acceptance Criteria:** API and web app deployed; published landing pages served over HTTPS on a stable domain.
+
+### FR-7.4 Observability
+**Acceptance Criteria:** structured logs shipped, job success/failure metrics, alert on repeated job failures.
+
+### FR-7.5 Backups and restore drill
+**Acceptance Criteria:** scheduled database backups; one documented and rehearsed restore.
+
+---
+
 ## Cross-Cutting Acceptance Criteria (apply to every task)
 
 - **CC-1** — Authorization is enforced server-side on every endpoint.
@@ -1164,12 +1324,15 @@ runs clean on a fresh database, rolls back cleanly, and matches `## Entity Field
 | Slice | Contents | Depends on |
 |---|---|---|
 | **0 — Database schema (blocking)** | DB-0.1–DB-0.24 (schema, integrity, indexes, RLS, concurrency, PII, roles, CI, performance, retention, docs) | — |
-| **A — Foundation & onboarding** | FR-0.x, FR-1.1.1–1.1.5, FR-1.2.x | 0 |
+| **A — Foundation & import** | FR-0.1–FR-0.5, FR-1.1.1–1.1.5 | 0 |
+| **0.5 — Authentication & onboarding** | FR-0.6.x, FR-0.7.x | A (tenant context) |
+| **UI — Web application** | FR-6.x | runs in parallel from A |
 | **B — Concept evaluation** | FR-2.1.x, FR-1.1.6 (integration import) | A (sales + profile data) |
 | **C — Recommendations & assets** | FR-2.2.x, FR-3.1.x, FR-3.2.x | B (concepts), D1/D3 |
 | **D — Measurement** | FR-4.1.x | C (live pages and campaigns) |
 | **E — Decision & investment** | FR-5.1.x, FR-5.2.x | D (test results) |
 | **F — Optimization** | FR-4.2.5 only (recommendations) | D + one complete test cycle |
+| **Ops — Deployment** | FR-7.x | E |
 
 **Recommended MVP cut:** 0 + A + B + C + D + E, with FR-4.2.5 recommendations only.
 **Hard rule:** No application module starts before Phase 0 (DB-0.1–DB-0.24) is green, with DB-0.21 (CI pipeline) reporting success.
