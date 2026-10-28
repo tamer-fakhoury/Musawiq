@@ -1,24 +1,30 @@
-# PO scheduler - sends Check Engineers every 20 min and reviews work
-import json, time, urllib.request
+# PO watcher - file-based trigger
+import json, time, os, subprocess
 from pathlib import Path
 
+TRIGGER = Path('var/po_check_trigger.txt')
+REPO = Path('.')
 CFG = Path('scripts/po_config.json')
-INTERVAL = 1200
 
-def check():
+def review():
     try:
-        cfg = json.loads(CFG.read_text())
-        # trigger a check via notify or just log
-        try:
-            body = json.dumps({'msg':'Check Engineers'}).encode()
-            req = urllib.request.Request('http://localhost:5555/notify', data=body, method='POST', headers={'Content-Type':'application/json'})
-            urllib.request.urlopen(req, timeout=5)
-        except:
-            pass
-    except:
-        pass
+        r = subprocess.run(['git', 'log', '--oneline', '-10'], cwd=str(REPO), stdout=subprocess.PIPE)
+        print(r.stdout.decode())
+    except Exception as e:
+        print('err', e)
 
-if __name__=='__main__':
+if __name__ == '__main__':
+    TRIGGER.parent.mkdir(exist_ok=True)
+    if not TRIGGER.exists():
+        TRIGGER.write_text(str(time.time()))
+    last = TRIGGER.stat().st_mtime
     while True:
-        check()
-        time.sleep(INTERVAL)
+        try:
+            st = TRIGGER.stat().st_mtime
+            if st != last:
+                last = st
+                print('TRIGGERED - checking engineers')
+                review()
+        except Exception:
+            pass
+        time.sleep(30)
