@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     ai_provider: str = Field(default="groq", min_length=1)
     groq_api_key: str | None = Field(default=None)
     groq_model: str = Field(
-        default="llama-3.3-70b-versatile", min_length=1
+        default="qwen/qwen3.8-27b", min_length=1
     )
     openai_api_key: str | None = Field(default=None)
     openai_model: str = Field(default="gpt-4o-mini", min_length=1)

@@ -1425,3 +1425,36 @@ now but use the same `metric_snapshots` shape a real platform sync will write.
 **Explicitly deferred:** Automated budget reallocation (FR-4.2.6), real-time streaming optimization, multi-touch attribution, payment processing, payment-gateway deposit verification (D2), inventory/warehouse sync, mobile apps, and multi-user collaboration beyond the defined roles.
 
 
+
+---
+
+## Module 8 — AI Marketing Feedback Loop (MVP)
+
+Approved MVP per business owner. Arabic-first, advisory only.
+
+### FR-8.1 Campaign, ad set, and ad content setup
+- Create/edit campaigns/ad sets/ad variations; manual edits allowed.
+- Config fingerprint for change detection.
+
+### FR-8.2 Signal ingestion
+- POST /campaigns/{id}/signals accepts simulated signals; upsert metric_snapshots (7-day windows).
+
+### FR-8.3 AI provider abstraction
+- Base + OpenAI + Groq + fixture; Groq default (llama-3.3-70b-versatile), OpenAI gpt-4o-mini. Env: MUSAWIQ_AI_PROVIDER, GROQ_API_KEY, OPENAI_API_KEY.
+
+### FR-8.4 AI demand and issue analysis
+- Arabic MSA output. Table i_analyses (migration 0019). Contract: demand/issues/recommendations/next_steps_ar. Anti-fabrication: must match signals.
+
+### FR-8.5 Manual change application
+- Advisory only; copy-paste changes. Edit endpoints + fingerprinting.
+
+### FR-8.6 Re-evaluation with delta
+- Compare to parent; compute per-metric deltas and summary; show in result.delta.
+
+### FR-8.7 Arabic RTL MVP screens
+- Campaign signals screen, AI diagnosis with copyable Arabic recommendations.
+
+### FR-8.8 Demo dataset and loop script
+- Arabic demo seed + scripts/demo_flow.py (fixture default).
+
+**Status:** In progress. See docs/STATUS.md.
