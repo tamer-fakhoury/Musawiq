@@ -17,6 +17,7 @@ from musawiq.services.audience import (
     AudienceValidationError,
     create_profile,
     get_current,
+    get_profile_history,
     replace_segments,
     update_profile,
 )
@@ -92,6 +93,15 @@ def current(
     if profile is None:
         raise _not_found()
     return profile
+
+
+@router.get("/history")
+def history(
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    return get_profile_history(session, tenant)
 
 
 @router.put("/{profile_id}/segments")

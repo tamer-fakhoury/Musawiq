@@ -215,6 +215,26 @@ def get_current(
     return _profile_out(row, _fetch_segments(session, tenant, row["id"]))
 
 
+def get_profile_history(
+    session: Session, tenant: TenantContext
+) -> list[dict[str, Any]]:
+    rows = session.execute(
+        text(
+            """
+            SELECT * FROM audience_profiles
+            WHERE store_id = :store_id
+            ORDER BY version DESC
+            """
+        ),
+        {"store_id": tenant.store_id},
+    ).mappings().all()
+    return [
+        _profile_out(row, _fetch_segments(session, tenant, row["id"]))
+        for row in rows
+    ]
+
+
+
 def _validated_segment(segment: object) -> dict[str, Any]:
     if not isinstance(segment, Mapping):
         raise AudienceValidationError("each segment must be an object")
@@ -254,6 +274,45 @@ def _validated_segment(segment: object) -> dict[str, Any]:
     }
 
 
+def _location_codes(validated: list[dict[str, Any]]) -> list[str]:
+    codes: list[str] = []
+    for segment in validated:
+        for location in segment["locations"]:
+            if isinstance(location, str):
+                code = location
+            elif isinstance(location, Mapping) and isinstance(
+                location.get("country_code"), str
+            ):
+                code = location["country_code"]
+            else:
+                raise AudienceValidationError(
+                    "each location must be a country code or an object with country_code"
+                )
+            if code not in codes:
+                codes.append(code)
+    return codes
+
+
+def _assert_known_countries(
+    session: Session, codes: list[str]
+) -> None:
+    if not codes:
+        return
+    known = session.execute(
+        text(
+            "SELECT code FROM countries "
+            "WHERE code = ANY(:codes) AND is_active"
+        ),
+        {"codes": codes},
+    ).scalars().all()
+    unknown = [code for code in codes if code not in set(known)]
+    if unknown:
+        raise AudienceValidationError(
+            f"unknown country code: {', '.join(unknown)}"
+        )
+
+
+
 def replace_segments(
     session: Session,
     tenant: TenantContext,
@@ -263,6 +322,7 @@ def replace_segments(
     if not isinstance(segments, list):
         raise AudienceValidationError("segments must be a list")
     validated = [_validated_segment(segment) for segment in segments]
+    _assert_known_countries(session, _location_codes(validated))
 
     profile_uuid = _coerce_uuid(profile_id)
     exists = session.execute(
@@ -376,6 +436,7 @@ __all__ = [
     "AudienceValidationError",
     "create_profile",
     "get_current",
+    "get_profile_history",
     "replace_segments",
     "update_profile",
 ]
