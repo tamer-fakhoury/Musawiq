@@ -21,6 +21,7 @@ from musawiq.services.landing_pages import (
     save_draft,
     upload_product_image,
 )
+from musawiq.services.page_generation import request_generation
 
 router = APIRouter(prefix="/landing-pages", tags=["landing-pages"])
 
@@ -45,6 +46,7 @@ class DraftRequest(BaseModel):
 
 class CreateDraftRequest(DraftRequest):
     product_concept_id: uuid.UUID
+    template_id: uuid.UUID | None = None
 
 
 def _require_action(action: Action):
@@ -115,6 +117,24 @@ def autosave(
         return save_draft(session, tenant, page_id, payload.model_dump())
     except LandingPageError as exc:
         return _error(request, exc)
+
+
+@router.post("/{page_id}/generate", status_code=202)
+def generate(
+    page_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        job = request_generation(session, tenant, page_id)
+    except LandingPageError as exc:
+        return _error(request, exc)
+    return {
+        "job_id": str(job["id"]),
+        "state": job["state"],
+    }
 
 
 @router.get("/{page_id}")

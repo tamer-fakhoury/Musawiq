@@ -17,6 +17,36 @@ from musawiq.storage import get_storage
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_NAME_LENGTH = 200
 ORDER_METHODS = frozenset({"whatsapp", "cod"})
+RESPONSIVE_TEMPLATE_KEY = "responsive"
+PAGE_TEMPLATE_SCHEMA: dict[str, Any] = {
+    "schema_version": 1,
+    "sections": [
+        {"type": "image", "field": "image_file_ids", "required": False},
+        {"type": "text", "field": "name", "required": True},
+        {"type": "text", "field": "description", "required": False},
+        {
+            "type": "price",
+            "field": "price_minor",
+            "currency_field": "currency",
+            "required": True,
+        },
+        {"type": "cta", "field": "order_method", "required": True},
+    ],
+    "breakpoints": {
+        "mobile": {
+            "max_width_px": 640,
+            "columns": 1,
+            "image_aspect_ratio": "1:1",
+            "font_scale": 1.0,
+        },
+        "desktop": {
+            "min_width_px": 1024,
+            "columns": 2,
+            "image_aspect_ratio": "4:3",
+            "font_scale": 1.15,
+        },
+    },
+}
 IMAGE_TYPES = {
     "image/jpeg": (".jpg", ".jpeg"),
     "image/png": (".png",),
@@ -191,21 +221,35 @@ def _assert_images(
         )
 
 
-def _default_template(session: Session) -> uuid.UUID:
-    template_id = session.execute(
-        text("SELECT id FROM page_templates ORDER BY version, id LIMIT 1")
-    ).scalar_one_or_none()
-    if template_id is not None:
-        return template_id
+def ensure_responsive_template(session: Session) -> uuid.UUID:
+    """Return the built-in responsive template, creating or refreshing it."""
     return session.execute(
         text(
             """
-            INSERT INTO page_templates (key, version, name, schema)
-            VALUES ('default', 1, 'Default', '{"schema_version": 1}'::jsonb)
+            INSERT INTO page_templates (key, version, name, is_active, schema)
+            VALUES (:key, 1, 'Responsive Product', true, :schema)
+            ON CONFLICT (key, version)
+            DO UPDATE SET schema = EXCLUDED.schema, is_active = true
             RETURNING id
             """
-        )
+        ),
+        {"key": RESPONSIVE_TEMPLATE_KEY, "schema": Jsonb(PAGE_TEMPLATE_SCHEMA)},
     ).scalar_one()
+
+
+def _resolve_template(session: Session, template_id: object) -> uuid.UUID:
+    if template_id is None:
+        return ensure_responsive_template(session)
+    resolved = _uuid_value(template_id, "template_id")
+    exists = session.execute(
+        text("SELECT 1 FROM page_templates WHERE id = :id AND is_active"),
+        {"id": resolved},
+    ).scalar_one_or_none()
+    if exists is None:
+        raise LandingPageError(
+            "invalid_template", "template_id must reference an active template."
+        )
+    return resolved
 
 
 def _content(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -358,6 +402,8 @@ def _page_out(
         "draft_version": version["version"] if version else None,
         "price_minor": version["price_minor"] if version else None,
         "content": version["content"] if version else None,
+        "generated_by": version["generated_by"] if version else None,
+        "model_version": version["model_version"] if version else None,
         "image_file_ids": (
             [str(item) for item in version["image_file_ids"]] if version else []
         ),
@@ -393,6 +439,7 @@ def create_draft(
             "invalid_product_concept", "Product concept must belong to the store."
         )
     _assert_images(session, tenant, data["image_file_ids"])
+    template_id = _resolve_template(session, payload.get("template_id"))
 
     page_id = session.execute(
         text(
@@ -411,7 +458,7 @@ def create_draft(
             "store_id": tenant.store_id,
             "product_concept_id": concept_id,
             "slug": _slugify(data["name"]),
-            "template_id": _default_template(session),
+            "template_id": template_id,
             "language": data["language"],
             "currency": data["currency"],
         },
@@ -566,8 +613,11 @@ def upload_product_image(
 __all__ = [
     "MAX_IMAGE_BYTES",
     "ORDER_METHODS",
+    "PAGE_TEMPLATE_SCHEMA",
+    "RESPONSIVE_TEMPLATE_KEY",
     "LandingPageError",
     "create_draft",
+    "ensure_responsive_template",
     "get_landing_page",
     "save_draft",
     "upload_product_image",
