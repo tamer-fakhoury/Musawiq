@@ -28,6 +28,10 @@ from musawiq.services.concepts import (
     update_concept,
     upload_product_image,
 )
+from musawiq.services.sufficiency import (
+    get_latest_sufficiency_check,
+    run_sufficiency_check,
+)
 
 router = APIRouter(prefix="/product-concepts", tags=["concepts"])
 
@@ -369,6 +373,70 @@ def delete(
     except ConceptConflict as exc:
         return _conflict_response(request, exc)
     return Response(status_code=204)
+
+
+@router.post("/{concept_id}/sufficiency-checks", status_code=201)
+@router.post(
+    "/{concept_id}/sufficiency-check",
+    status_code=201,
+    include_in_schema=False,
+)
+def run_sufficiency(
+    concept_id: uuid.UUID,
+    request: Request,
+    body: dict[str, Any] | None = None,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    competitive_data = None
+    if body is not None:
+        competitive_data = body.get("competitive_data")
+        if competitive_data is not None and not isinstance(
+            competitive_data, dict
+        ):
+            return _validation_response(
+                request,
+                ConceptValidationError(
+                    {
+                        "competitive_data": (
+                            "competitive_data must be an object"
+                        )
+                    }
+                ),
+            )
+    try:
+        return run_sufficiency_check(
+            session,
+            tenant,
+            concept_id,
+            competitive_data=competitive_data,
+        )
+    except ConceptNotFound:
+        return _not_found_response(request)
+
+
+@router.get("/{concept_id}/sufficiency-checks/latest")
+@router.get(
+    "/{concept_id}/sufficiency-check/latest",
+    include_in_schema=False,
+)
+def latest_sufficiency(
+    concept_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    try:
+        result = get_latest_sufficiency_check(
+            session, tenant, concept_id
+        )
+    except ConceptNotFound:
+        return _not_found_response(request)
+    if result is None:
+        return _not_found_response(request)
+    return result
 
 
 __all__ = ["router"]

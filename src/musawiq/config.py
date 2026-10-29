@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     )
     openai_api_key: str | None = Field(default=None)
     openai_model: str = Field(default="gpt-4o-mini", min_length=1)
+    sufficiency_policy_version: str = Field(default="1", min_length=1)
+    sales_history_min_orders: int = Field(default=20, ge=1)
+    sales_history_min_days: int = Field(default=30, ge=1)
+    sales_history_stale_days: int = Field(default=90, ge=1)
+    audience_stale_days: int = Field(default=180, ge=1)
+    competitive_data_stale_days: int = Field(default=90, ge=1)
 
     @property
     def cors_origin_list(self) -> list[str]:
