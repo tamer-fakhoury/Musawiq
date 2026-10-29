@@ -22,6 +22,7 @@ VALID_JOB_TYPES = frozenset(
         "metric_sync",
         "recommendation_generation",
         "content_generation",
+        "batch_evaluation",
     }
 )
 

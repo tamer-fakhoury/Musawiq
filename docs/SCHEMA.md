@@ -436,7 +436,7 @@ Each physical table maps to an entity in `docs/Specifications.md` (`## Entity Fi
 
 ### Check constraints
 
-- `ck_async_jobs_job_type`: `CHECK (job_type = ANY (ARRAY['import'::text, 'integration_sync'::text, 'page_generation'::text, 'ad_publication'::text, 'metric_sync'::text, 'recommendation_generation'::text, 'content_generation'::text]))`
+- `ck_async_jobs_job_type`: `CHECK (job_type = ANY (ARRAY['import'::text, 'integration_sync'::text, 'page_generation'::text, 'ad_publication'::text, 'metric_sync'::text, 'recommendation_generation'::text, 'content_generation'::text, 'batch_evaluation'::text]))`
 - `ck_async_jobs_state`: `CHECK (state = ANY (ARRAY['queued'::text, 'running'::text, 'succeeded'::text, 'failed'::text, 'partial'::text, 'cancelled'::text]))`
 
 ### Indexes

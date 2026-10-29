@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from musawiq.jobs.models import JobOutcome
+from musawiq.workers.batch_evaluation import run_batch_evaluation_job
 
 JobHandler = Callable[[Mapping[str, Any]], JobOutcome | Mapping[str, Any] | Any]
 
@@ -17,6 +18,7 @@ def noop(job: Mapping[str, Any]) -> JobOutcome:
 
 JOB_HANDLERS: dict[str, JobHandler] = {
     "import": noop,
+    "batch_evaluation": run_batch_evaluation_job,
 }
 
 

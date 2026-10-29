@@ -17,6 +17,8 @@ from musawiq.api.routers.campaigns import router as campaigns_router
 from musawiq.api.routers.audiences import router as audiences_router
 from musawiq.api.routers.categories import router as categories_router
 from musawiq.api.routers.concepts import router as concepts_router
+from musawiq.api.routers.evaluations import router as evaluations_router
+from musawiq.api.routers.feedback import router as feedback_router
 from musawiq.api.routers.health import router as health_router
 from musawiq.api.routers.import_preview import router as import_preview_router
 from musawiq.api.routers.imports import router as imports_router
@@ -88,7 +90,9 @@ def create_app(tenant_provider: TenantProvider | None = None) -> FastAPI:
     app.include_router(import_preview_router)
     app.include_router(audiences_router)
     app.include_router(categories_router)
+    app.include_router(feedback_router)
     app.include_router(concepts_router)
+    app.include_router(evaluations_router)
     app.include_router(campaigns_router)
     app.include_router(analyses_router)
     app.include_router(signals_router)

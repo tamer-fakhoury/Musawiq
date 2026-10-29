@@ -5,7 +5,9 @@ const NAV_ITEMS = [
   "لوحة التحكم",
   "الاستيراد",
   "الجمهور",
+  "ملاحظات العملاء",
   "المفاهيم",
+  "التقييم",
   "التوصيات",
   "الصفحات",
   "الحملات",
@@ -13,7 +15,9 @@ const NAV_ITEMS = [
 ] as const;
 
 const NAV_HREFS: Partial<Record<(typeof NAV_ITEMS)[number], string>> = {
+  "ملاحظات العملاء": "/feedback",
   المفاهيم: "/concepts",
+  التقييم: "/evaluations",
   الحملات: "/campaigns",
 };
 

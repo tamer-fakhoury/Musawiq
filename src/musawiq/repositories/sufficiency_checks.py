@@ -21,6 +21,11 @@ class SufficiencyCheckRepository(TenantScopedRepository):
     def insert_check(self, values: Mapping[str, Any]) -> Mapping[str, Any]:
         return self.insert(values)
 
+    def get_check(
+        self, check_id: uuid.UUID | str
+    ) -> Mapping[str, Any] | None:
+        return self.get(check_id)
+
     def latest_for_concept(
         self, concept_id: uuid.UUID | str
     ) -> Mapping[str, Any] | None:
