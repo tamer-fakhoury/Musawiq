@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -12,8 +13,15 @@ from musawiq.api.deps import get_session, get_tenant
 from musawiq.auth.permissions import Action
 from musawiq.auth.service import AuthorizationService
 from musawiq.db.tenant import TenantContext
+from musawiq.middleware.errors import error_response
+from musawiq.services.store_profile import StoreProfileError, create_custom_niche
 
 router = APIRouter(tags=["taxonomy"])
+
+
+class CreateNicheRequest(BaseModel):
+    category_id: uuid.UUID
+    name: str
 
 
 def _require_action(action: Action):
@@ -85,6 +93,30 @@ def list_niches(
         }
         for row in rows
     ]
+
+
+@router.post("/niches", status_code=201)
+def create_niche(
+    payload: CreateNicheRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        return create_custom_niche(
+            session,
+            tenant,
+            category_id=payload.category_id,
+            name=payload.name,
+        )
+    except StoreProfileError as exc:
+        return error_response(
+            request,
+            status_code=exc.status_code,
+            code=exc.code,
+            message=exc.message,
+        )
 
 
 __all__ = ["router"]
