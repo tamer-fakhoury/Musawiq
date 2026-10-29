@@ -6,6 +6,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from musawiq.api.deps import get_session, get_tenant
@@ -27,6 +28,10 @@ from musawiq.services.concepts import (
     unarchive_concept,
     update_concept,
     upload_product_image,
+)
+from musawiq.services.concepts_compare import (
+    compare_concepts,
+    select_concepts,
 )
 from musawiq.services.sufficiency import (
     get_latest_sufficiency_check,
@@ -166,6 +171,51 @@ def _expected_version(
             {"version": "If-Match and body version must match"}
         )
     return header if header is not None else body
+
+
+class ConceptIdsRequest(BaseModel):
+    concept_ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+
+
+@router.post("/compare")
+def compare(
+    body: ConceptIdsRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    try:
+        return compare_concepts(session, tenant, body.concept_ids)
+    except ConceptValidationError as exc:
+        return _validation_response(request, exc)
+    except ConceptNotFound:
+        return _not_found_response(request)
+    except ConceptConflict as exc:
+        return _conflict_response(request, exc)
+
+
+@router.post("/select")
+def select(
+    body: ConceptIdsRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        return select_concepts(
+            session,
+            tenant,
+            body.concept_ids,
+            correlation_id=getattr(request.state, "correlation_id", None),
+        )
+    except ConceptValidationError as exc:
+        return _validation_response(request, exc)
+    except ConceptNotFound:
+        return _not_found_response(request)
+    except ConceptConflict as exc:
+        return _conflict_response(request, exc)
 
 
 @router.get("")

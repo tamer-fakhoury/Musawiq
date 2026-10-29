@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   "ملاحظات العملاء",
   "المفاهيم",
   "التقييم",
+  "المقارنة",
   "التوصيات",
   "الصفحات",
   "الحملات",
@@ -18,6 +19,7 @@ const NAV_HREFS: Partial<Record<(typeof NAV_ITEMS)[number], string>> = {
   "ملاحظات العملاء": "/feedback",
   المفاهيم: "/concepts",
   التقييم: "/evaluations",
+  المقارنة: "/compare",
   الحملات: "/campaigns",
 };
 

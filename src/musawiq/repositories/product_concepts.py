@@ -168,6 +168,29 @@ class ProductConceptRepository(TenantScopedRepository):
             .one_or_none()
         )
 
+    def get_many_for_update(
+        self, record_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, Mapping[str, Any]]:
+        tenant = self._tenant()
+        if not record_ids:
+            return {}
+        rows = self.session.execute(
+            text(
+                f"""
+                SELECT * FROM {self._table_sql}
+                WHERE store_id = :tenant_store_id
+                  AND deleted_at IS NULL
+                  AND id = ANY(CAST(:ids AS uuid[]))
+                FOR UPDATE
+                """
+            ),
+            {
+                "tenant_store_id": tenant.store_id,
+                "ids": record_ids,
+            },
+        ).mappings().all()
+        return {row["id"]: row for row in rows}
+
     def has_evaluation(self, record_id: uuid.UUID | str) -> bool:
         tenant = self._tenant()
         concept_uuid = uuid.UUID(str(record_id))

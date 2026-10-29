@@ -35,6 +35,8 @@ def test_real_app_registers_every_router():
         "/product-concepts/{concept_id}",
         "/product-concepts/{concept_id}/archive",
         "/product-concepts/{concept_id}/unarchive",
+        "/product-concepts/compare",
+        "/product-concepts/select",
         "/product-concepts/{concept_id}/sufficiency-checks",
         "/product-concepts/{concept_id}/sufficiency-checks/latest",
         "/product-concepts/{concept_id}/evaluations",

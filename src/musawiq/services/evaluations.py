@@ -118,8 +118,6 @@ def _input_snapshot(
             "cost_minor": concept["cost_minor"],
             "currency": concept["currency"].strip(),
             "gross_margin_bp": concept["gross_margin_bp"],
-            "status": concept["status"],
-            "version": concept["version"],
         },
         "sufficiency": {
             "sales_history_status": sufficiency["sales_history_status"],
@@ -219,6 +217,20 @@ def evaluate_concept(
         )
     except ScoringStrategyError as exc:
         raise EvaluationValidationError(str(exc)) from exc
+
+    if concept["status"] == "draft":
+        updated = ProductConceptRepository(session).update_versioned(
+            concept["id"],
+            concept["version"],
+            {
+                "status": "evaluated",
+                "version": concept["version"] + 1,
+            },
+        )
+        if updated is None:
+            raise EvaluationValidationError(
+                "Concept changed during evaluation"
+            )
     return _evaluation_out(row, factors)
 
 
