@@ -21,6 +21,7 @@ from musawiq.api.routers.health import router as health_router
 from musawiq.api.routers.import_preview import router as import_preview_router
 from musawiq.api.routers.imports import router as imports_router
 from musawiq.api.routers.jobs import router as jobs_router
+from musawiq.api.routers.landing_pages import router as landing_pages_router
 from musawiq.api.routers.signals import router as signals_router
 from musawiq.api.routers.store_profile import router as store_profile_router
 from musawiq.config import ConfigurationError, get_settings
@@ -93,5 +94,6 @@ def create_app(tenant_provider: TenantProvider | None = None) -> FastAPI:
     app.include_router(analyses_router)
     app.include_router(signals_router)
     app.include_router(store_profile_router)
+    app.include_router(landing_pages_router)
     return app
 
