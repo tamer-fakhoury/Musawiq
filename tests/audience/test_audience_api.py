@@ -209,6 +209,50 @@ def test_segments_replaced_wholesale_and_invalid_age_rejected(
     ]
 
 
+def test_segments_reject_unknown_country_and_keep_existing(
+    client, tenant, taxonomy
+):
+    created = _create_profile(client, tenant, taxonomy.global_niche)
+    profile_id = created.json()["id"]
+    valid = client.put(
+        f"/audience-profiles/{profile_id}/segments",
+        json={
+            "segments": [
+                {
+                    "label": "Gulf",
+                    "locations": [{"country_code": "SA"}],
+                    "age_min": 18,
+                    "age_max": 40,
+                }
+            ]
+        },
+        headers=_headers(tenant),
+    )
+    assert valid.status_code == 200
+
+    invalid = client.put(
+        f"/audience-profiles/{profile_id}/segments",
+        json={
+            "segments": [
+                {
+                    "label": "Nowhere",
+                    "locations": ["ZZ"],
+                    "age_min": 18,
+                    "age_max": 40,
+                }
+            ]
+        },
+        headers=_headers(tenant),
+    )
+    assert invalid.status_code == 422
+    assert "ZZ" in invalid.json()["detail"]
+
+    current = client.get("/audience-profiles/current", headers=_headers(tenant))
+    assert [segment["label"] for segment in current.json()["segments"]] == [
+        "Gulf"
+    ]
+
+
 def test_other_store_cannot_see_or_change_profile(
     client, tenant, make_tenant, taxonomy
 ):
