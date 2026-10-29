@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date, datetime, time, timezone
 from typing import Any
 
 from sqlalchemy import text
@@ -30,6 +31,22 @@ CONCEPT_FIELDS = (
     "currency",
     "image_file_id",
 )
+
+CONCEPT_STATUSES = frozenset(
+    {"draft", "evaluated", "selected", "archived"}
+)
+
+CONCEPT_SORT_KEYS = frozenset({"score", "category", "created_at"})
+
+_SORT_ALIASES = {
+    "score": "score",
+    "latest_score": "score",
+    "category": "category",
+    "category_id": "category",
+    "created": "created_at",
+    "created_at": "created_at",
+    "date": "created_at",
+}
 
 
 class ConceptError(Exception):
@@ -378,8 +395,16 @@ def _file_out(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _optional(row: Mapping[str, Any], key: str) -> Any:
+    return row[key] if key in row else None
+
+
 def _concept_out(row: Mapping[str, Any]) -> dict[str, Any]:
     margin_bp = int(row["gross_margin_bp"])
+    latest_score = _optional(row, "latest_score")
+    latest_evaluation_id = _optional(row, "latest_evaluation_id")
+    latest_score_scale = _optional(row, "latest_score_scale")
+    latest_evaluated_at = _optional(row, "latest_evaluated_at")
     return {
         "id": str(row["id"]),
         "store_id": str(row["store_id"]),
@@ -398,6 +423,20 @@ def _concept_out(row: Mapping[str, Any]) -> dict[str, Any]:
         ),
         "status": row["status"],
         "version": row["version"],
+        "latest_evaluation_id": (
+            str(latest_evaluation_id) if latest_evaluation_id else None
+        ),
+        "latest_score": (
+            float(latest_score) if latest_score is not None else None
+        ),
+        "latest_score_scale": (
+            int(latest_score_scale)
+            if latest_score_scale is not None
+            else None
+        ),
+        "latest_confidence": _optional(row, "latest_confidence"),
+        "latest_is_reliable": _optional(row, "latest_is_reliable"),
+        "latest_evaluated_at": _iso(latest_evaluated_at),
         "created_by": str(row["created_by"]),
         "created_at": _iso(row["created_at"]),
         "updated_at": _iso(row["updated_at"]),
@@ -455,6 +494,158 @@ def create_concept(
     return _concept_out(row)
 
 
+def _coerce_version(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConceptValidationError(
+            {"version": "version must be a positive integer"}
+        )
+    if value < 1:
+        raise ConceptValidationError(
+            {"version": "version must be a positive integer"}
+        )
+    return value
+
+
+def _check_version(
+    row: Mapping[str, Any], expected_version: int | None
+) -> None:
+    if expected_version is not None and row["version"] != expected_version:
+        raise ConceptConflict("Concept version is stale")
+
+
+def _date_bound(
+    value: object, field: str, *, end_of_day: bool
+) -> datetime | None:
+    if _is_missing(value):
+        return None
+    if isinstance(value, datetime):
+        bound = value
+    elif isinstance(value, date):
+        bound = datetime.combine(
+            value, time.max if end_of_day else time.min
+        )
+    elif isinstance(value, str):
+        raw = value.strip()
+        try:
+            if len(raw) == 10:
+                parsed_date = date.fromisoformat(raw)
+                bound = datetime.combine(
+                    parsed_date, time.max if end_of_day else time.min
+                )
+            else:
+                bound = datetime.fromisoformat(
+                    raw.replace("Z", "+00:00")
+                )
+        except ValueError as exc:
+            raise ConceptValidationError(
+                {field: f"{field} must be an ISO date or datetime"}
+            ) from exc
+    else:
+        raise ConceptValidationError(
+            {field: f"{field} must be an ISO date or datetime"}
+        )
+    if bound.tzinfo is None:
+        bound = bound.replace(tzinfo=timezone.utc)
+    return bound
+
+
+def _sort_key(value: str | None) -> str:
+    key = (value or "created_at").strip().lower()
+    if key not in _SORT_ALIASES:
+        raise ConceptValidationError(
+            {"sort": "sort must be score, category, or created_at"}
+        )
+    return _SORT_ALIASES[key]
+
+
+def _direction(value: str | None) -> str:
+    normalized = (value or "desc").strip().lower()
+    if normalized not in {"asc", "desc"}:
+        raise ConceptValidationError(
+            {"direction": "direction must be asc or desc"}
+        )
+    return normalized
+
+
+def list_concepts(
+    session: Session,
+    tenant: TenantContext,
+    *,
+    status: str | None = None,
+    category_id: uuid.UUID | str | None = None,
+    created_from: str | None = None,
+    created_to: str | None = None,
+    search: str | None = None,
+    sort: str | None = "created_at",
+    direction: str | None = "desc",
+    limit: int = 100,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    """List store-owned concepts with lifecycle filters and latest score."""
+
+    normalized_status = None
+    if not _is_missing(status):
+        normalized_status = str(status).strip().lower()
+        if normalized_status not in CONCEPT_STATUSES:
+            raise ConceptValidationError(
+                {
+                    "status": (
+                        "status must be draft, evaluated, selected, or archived"
+                    )
+                }
+            )
+
+    category_uuid = None
+    if not _is_missing(category_id):
+        try:
+            category_uuid = uuid.UUID(str(category_id))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise ConceptValidationError(
+                {"category_id": "category_id must be a valid UUID"}
+            ) from exc
+
+    if not isinstance(limit, int) or isinstance(limit, bool):
+        raise ConceptValidationError(
+            {"limit": "limit must be an integer between 1 and 1000"}
+        )
+    if limit < 1 or limit > 1000:
+        raise ConceptValidationError(
+            {"limit": "limit must be an integer between 1 and 1000"}
+        )
+    if (
+        not isinstance(offset, int)
+        or isinstance(offset, bool)
+        or offset < 0
+    ):
+        raise ConceptValidationError(
+            {"offset": "offset must be a non-negative integer"}
+        )
+
+    from_bound = _date_bound(created_from, "created_from", end_of_day=False)
+    to_bound = _date_bound(created_to, "created_to", end_of_day=True)
+    if from_bound is not None and to_bound is not None and from_bound > to_bound:
+        raise ConceptValidationError(
+            {"created_to": "created_to must be on or after created_from"}
+        )
+
+    normalized_search = None
+    if not _is_missing(search):
+        normalized_search = str(search).strip()
+
+    rows = ProductConceptRepository(session).list_filtered(
+        status=normalized_status,
+        category_id=category_uuid,
+        created_from=from_bound,
+        created_to=to_bound,
+        search=normalized_search,
+        sort=_sort_key(sort),
+        direction=_direction(direction),
+        limit=limit,
+        offset=offset,
+    )
+    return [_concept_out(row) for row in rows]
+
+
 def get_concept(
     session: Session,
     tenant: TenantContext,
@@ -462,10 +653,20 @@ def get_concept(
 ) -> dict[str, Any]:
     """Reload a concept owned by the active tenant."""
 
-    row = ProductConceptRepository(session).get(concept_id)
+    row = ProductConceptRepository(session).get_with_latest(concept_id)
     if row is None or row["deleted_at"] is not None:
         raise ConceptNotFound("Product concept not found")
     return _concept_out(row)
+
+
+def _update_failure(
+    repository: ProductConceptRepository,
+    concept_id: uuid.UUID | str,
+) -> None:
+    current = repository.get(concept_id)
+    if current is None or current["deleted_at"] is not None:
+        raise ConceptNotFound("Product concept not found")
+    raise ConceptConflict("Concept version is stale")
 
 
 def update_concept(
@@ -475,8 +676,12 @@ def update_concept(
     payload: Mapping[str, Any],
     *,
     image: UploadedImage | None = None,
+    expected_version: int | None = None,
 ) -> dict[str, Any]:
-    """Edit a draft concept without touching evaluated rows."""
+    """Edit a draft concept with optional optimistic concurrency."""
+
+    if expected_version is not None:
+        expected_version = _coerce_version(expected_version)
 
     recognized = {
         field: value for field, value in payload.items() if field in CONCEPT_FIELDS
@@ -490,6 +695,7 @@ def update_concept(
     existing = repository.get(concept_id)
     if existing is None or existing["deleted_at"] is not None:
         raise ConceptNotFound("Product concept not found")
+    _check_version(existing, expected_version)
     if existing["status"] != "draft":
         raise ConceptConflict("Only draft concepts can be edited")
 
@@ -503,8 +709,9 @@ def update_concept(
     else:
         image_file_id = existing["image_file_id"]
 
-    row = repository.update(
+    row = repository.update_versioned(
         concept_id,
+        existing["version"],
         {
             **values,
             "image_file_id": image_file_id,
@@ -512,20 +719,116 @@ def update_concept(
         },
     )
     if row is None:
+        _update_failure(repository, concept_id)
+    return _concept_out(repository.get_with_latest(concept_id) or row)
+
+
+def archive_concept(
+    session: Session,
+    tenant: TenantContext,
+    concept_id: uuid.UUID | str,
+    *,
+    expected_version: int | None = None,
+) -> dict[str, Any]:
+    """Archive a concept so it can be restored later."""
+
+    if expected_version is not None:
+        expected_version = _coerce_version(expected_version)
+
+    repository = ProductConceptRepository(session)
+    existing = repository.get(concept_id)
+    if existing is None or existing["deleted_at"] is not None:
         raise ConceptNotFound("Product concept not found")
-    return _concept_out(row)
+    _check_version(existing, expected_version)
+    if existing["status"] == "archived":
+        return _concept_out(
+            repository.get_with_latest(concept_id) or existing
+        )
+
+    row = repository.update_versioned(
+        concept_id,
+        existing["version"],
+        {
+            "status": "archived",
+            "version": existing["version"] + 1,
+        },
+    )
+    if row is None:
+        _update_failure(repository, concept_id)
+    return _concept_out(repository.get_with_latest(concept_id) or row)
+
+
+def unarchive_concept(
+    session: Session,
+    tenant: TenantContext,
+    concept_id: uuid.UUID | str,
+    *,
+    expected_version: int | None = None,
+) -> dict[str, Any]:
+    """Restore an archived concept to its evaluated or draft state."""
+
+    if expected_version is not None:
+        expected_version = _coerce_version(expected_version)
+
+    repository = ProductConceptRepository(session)
+    existing = repository.get(concept_id)
+    if existing is None or existing["deleted_at"] is not None:
+        raise ConceptNotFound("Product concept not found")
+    _check_version(existing, expected_version)
+    if existing["status"] != "archived":
+        raise ConceptConflict("Only archived concepts can be unarchived")
+
+    restored_status = (
+        "evaluated" if repository.has_evaluation(concept_id) else "draft"
+    )
+    row = repository.update_versioned(
+        concept_id,
+        existing["version"],
+        {
+            "status": restored_status,
+            "version": existing["version"] + 1,
+        },
+    )
+    if row is None:
+        _update_failure(repository, concept_id)
+    return _concept_out(repository.get_with_latest(concept_id) or row)
+
+
+def delete_concept(
+    session: Session,
+    tenant: TenantContext,
+    concept_id: uuid.UUID | str,
+) -> None:
+    """Hard-delete an unevaluated concept; evaluated rows must be archived."""
+
+    repository = ProductConceptRepository(session)
+    existing = repository.get(concept_id)
+    if existing is None or existing["deleted_at"] is not None:
+        raise ConceptNotFound("Product concept not found")
+    if repository.has_evaluation(concept_id):
+        raise ConceptConflict(
+            "Evaluated concepts cannot be hard-deleted; archive instead"
+        )
+    if not repository.delete(concept_id):
+        raise ConceptNotFound("Product concept not found")
 
 
 __all__ = [
     "CONCEPT_FIELDS",
+    "CONCEPT_SORT_KEYS",
+    "CONCEPT_STATUSES",
     "MAX_IMAGE_BYTES",
     "ConceptConflict",
     "ConceptError",
     "ConceptNotFound",
     "ConceptValidationError",
     "UploadedImage",
+    "archive_concept",
     "create_concept",
+    "delete_concept",
     "get_concept",
+    "list_concepts",
+    "unarchive_concept",
     "update_concept",
     "upload_product_image",
 ]

@@ -33,6 +33,8 @@ def test_real_app_registers_every_router():
         "/product-concepts",
         "/product-concepts/images",
         "/product-concepts/{concept_id}",
+        "/product-concepts/{concept_id}/archive",
+        "/product-concepts/{concept_id}/unarchive",
         "/audience-profiles",
         "/audience-profiles/current",
         "/audience-profiles/{profile_id}/segments",

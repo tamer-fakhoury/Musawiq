@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from musawiq.api.deps import get_session, get_tenant
@@ -19,8 +19,12 @@ from musawiq.services.concepts import (
     ConceptNotFound,
     ConceptValidationError,
     UploadedImage,
+    archive_concept,
     create_concept,
+    delete_concept,
     get_concept,
+    list_concepts,
+    unarchive_concept,
     update_concept,
     upload_product_image,
 )
@@ -97,6 +101,8 @@ async def _read_payload(
             for field in CONCEPT_FIELDS
             if field in form
         }
+        if "version" in form:
+            payload["version"] = form.get("version")
         upload = form.get("image") or form.get("file")
         image = None
         if upload is not None and hasattr(upload, "read"):
@@ -114,6 +120,87 @@ async def _read_payload(
             )
         }
     )
+
+
+def _version_value(value: object) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ConceptValidationError(
+            {"version": "version must be a positive integer"}
+        )
+    try:
+        version = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ConceptValidationError(
+            {"version": "version must be a positive integer"}
+        ) from exc
+    if version < 1:
+        raise ConceptValidationError(
+            {"version": "version must be a positive integer"}
+        )
+    return version
+
+
+def _header_version(request: Request) -> int | None:
+    raw = request.headers.get("if-match")
+    if raw is None or not raw.strip():
+        return None
+    value = raw.strip()
+    if value.startswith("W/"):
+        value = value[2:].strip()
+    return _version_value(value.strip('"'))
+
+
+def _expected_version(
+    request: Request, payload: dict[str, Any]
+) -> int | None:
+    header = _header_version(request)
+    body = _version_value(payload.get("version"))
+    if header is not None and body is not None and header != body:
+        raise ConceptValidationError(
+            {"version": "If-Match and body version must match"}
+        )
+    return header if header is not None else body
+
+
+@router.get("")
+def list_all(
+    request: Request,
+    status: str | None = None,
+    category_id: uuid.UUID | None = None,
+    created_from: str | None = None,
+    created_to: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    search: str | None = None,
+    q: str | None = None,
+    sort: str = "created_at",
+    sort_by: str | None = None,
+    direction: str = "desc",
+    order: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    try:
+        return list_concepts(
+            session,
+            tenant,
+            status=status,
+            category_id=category_id,
+            created_from=created_from or date_from,
+            created_to=created_to or date_to,
+            search=search or q,
+            sort=sort_by or sort,
+            direction=order or direction,
+            limit=limit,
+            offset=offset,
+        )
+    except ConceptValidationError as exc:
+        return _validation_response(request, exc)
 
 
 @router.post("", status_code=201)
@@ -174,12 +261,34 @@ async def patch(
 ):
     try:
         payload, image = await _read_payload(request)
+        expected_version = _expected_version(request, payload)
+        status = payload.get("status")
+        has_fields = any(field in payload for field in CONCEPT_FIELDS)
+        if status is not None and not has_fields and image is None:
+            if status == "archived":
+                return archive_concept(
+                    session,
+                    tenant,
+                    concept_id,
+                    expected_version=expected_version,
+                )
+            if status == "draft":
+                return unarchive_concept(
+                    session,
+                    tenant,
+                    concept_id,
+                    expected_version=expected_version,
+                )
+            raise ConceptValidationError(
+                {"status": "status must be archived or draft"}
+            )
         return update_concept(
             session,
             tenant,
             concept_id,
             payload,
             image=image,
+            expected_version=expected_version,
         )
     except ConceptValidationError as exc:
         return _validation_response(request, exc)
@@ -187,6 +296,79 @@ async def patch(
         return _not_found_response(request)
     except ConceptConflict as exc:
         return _conflict_response(request, exc)
+
+
+@router.post("/{concept_id}/archive")
+def archive(
+    concept_id: uuid.UUID,
+    request: Request,
+    body: dict[str, Any] | None = None,
+    version: int | None = None,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        payload: dict[str, Any] = dict(body or {})
+        if version is not None:
+            payload["version"] = version
+        return archive_concept(
+            session,
+            tenant,
+            concept_id,
+            expected_version=_expected_version(request, payload),
+        )
+    except ConceptValidationError as exc:
+        return _validation_response(request, exc)
+    except ConceptNotFound:
+        return _not_found_response(request)
+    except ConceptConflict as exc:
+        return _conflict_response(request, exc)
+
+
+@router.post("/{concept_id}/unarchive")
+def unarchive(
+    concept_id: uuid.UUID,
+    request: Request,
+    body: dict[str, Any] | None = None,
+    version: int | None = None,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        payload: dict[str, Any] = dict(body or {})
+        if version is not None:
+            payload["version"] = version
+        return unarchive_concept(
+            session,
+            tenant,
+            concept_id,
+            expected_version=_expected_version(request, payload),
+        )
+    except ConceptValidationError as exc:
+        return _validation_response(request, exc)
+    except ConceptNotFound:
+        return _not_found_response(request)
+    except ConceptConflict as exc:
+        return _conflict_response(request, exc)
+
+
+@router.delete("/{concept_id}", status_code=204)
+def delete(
+    concept_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        delete_concept(session, tenant, concept_id)
+    except ConceptNotFound:
+        return _not_found_response(request)
+    except ConceptConflict as exc:
+        return _conflict_response(request, exc)
+    return Response(status_code=204)
 
 
 __all__ = ["router"]

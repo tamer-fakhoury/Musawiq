@@ -12,6 +12,11 @@ const NAV_ITEMS = [
   "الحكم",
 ] as const;
 
+const NAV_HREFS: Partial<Record<(typeof NAV_ITEMS)[number], string>> = {
+  المفاهيم: "/concepts",
+  الحملات: "/campaigns",
+};
+
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -25,26 +30,29 @@ export function AppShell({ children }: { children: ReactNode }) {
           className="w-56 shrink-0 border-e border-zinc-200 p-4"
         >
           <ul className="space-y-1">
-            {NAV_ITEMS.map((item) => (
-              <li key={item}>
-                {item === "الحملات" ? (
-                  <Link
-                    href="/campaigns"
-                    className="block w-full rounded-md bg-zinc-900 px-3 py-2 text-start text-sm font-medium text-white"
-                  >
-                    {item}
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    disabled
-                    className="w-full rounded-md px-3 py-2 text-start text-sm text-zinc-400"
-                  >
-                    {item}
-                  </button>
-                )}
-              </li>
-            ))}
+            {NAV_ITEMS.map((item) => {
+              const href = NAV_HREFS[item];
+              return (
+                <li key={item}>
+                  {href ? (
+                    <Link
+                      href={href}
+                      className="block w-full rounded-md bg-zinc-900 px-3 py-2 text-start text-sm font-medium text-white"
+                    >
+                      {item}
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full rounded-md px-3 py-2 text-start text-sm text-zinc-400"
+                    >
+                      {item}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </nav>
         <main className="flex-1 p-6">{children}</main>
