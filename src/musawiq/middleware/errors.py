@@ -46,19 +46,21 @@ def error_response(
     code: str,
     message: str,
     headers: Mapping[str, str] | None = None,
+    fields: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     correlation_id = _correlation_id(request)
     response_headers: dict[str, Any] = dict(headers or {})
     response_headers[CORRELATION_ID_HEADER] = correlation_id
+    error: dict[str, Any] = {
+        "code": code,
+        "message": message,
+        "correlation_id": correlation_id,
+    }
+    if fields:
+        error["fields"] = dict(fields)
     return JSONResponse(
         status_code=status_code,
-        content={
-            "error": {
-                "code": code,
-                "message": message,
-                "correlation_id": correlation_id,
-            }
-        },
+        content={"error": error},
         headers=response_headers,
     )
 
