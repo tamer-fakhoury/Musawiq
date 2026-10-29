@@ -253,6 +253,45 @@ def test_segments_reject_unknown_country_and_keep_existing(
     ]
 
 
+def test_history_lists_all_versions_and_past_version_is_immutable(
+    client, tenant, taxonomy
+):
+    created = _create_profile(
+        client, tenant, taxonomy.global_niche, notes="v1 notes"
+    )
+    profile_id = created.json()["id"]
+    client.put(
+        f"/audience-profiles/{profile_id}/segments",
+        json={
+            "segments": [
+                {
+                    "label": "Original",
+                    "locations": ["SA"],
+                    "age_min": 18,
+                    "age_max": 30,
+                }
+            ]
+        },
+        headers=_headers(tenant),
+    )
+
+    updated = client.patch(
+        f"/audience-profiles/{profile_id}",
+        json={"notes": "v2 notes"},
+        headers=_headers(tenant),
+    )
+    assert updated.status_code == 200
+    assert updated.json()["version"] == 2
+
+    history = client.get("/audience-profiles/history", headers=_headers(tenant))
+    assert history.status_code == 200
+    versions = history.json()
+    assert [item["version"] for item in versions] == [2, 1]
+    assert [item["is_current"] for item in versions] == [True, False]
+    assert versions[1]["notes"] == "v1 notes"
+    assert [s["label"] for s in versions[1]["segments"]] == ["Original"]
+
+
 def test_other_store_cannot_see_or_change_profile(
     client, tenant, make_tenant, taxonomy
 ):

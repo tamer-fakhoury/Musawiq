@@ -215,6 +215,26 @@ def get_current(
     return _profile_out(row, _fetch_segments(session, tenant, row["id"]))
 
 
+def get_profile_history(
+    session: Session, tenant: TenantContext
+) -> list[dict[str, Any]]:
+    rows = session.execute(
+        text(
+            """
+            SELECT * FROM audience_profiles
+            WHERE store_id = :store_id
+            ORDER BY version DESC
+            """
+        ),
+        {"store_id": tenant.store_id},
+    ).mappings().all()
+    return [
+        _profile_out(row, _fetch_segments(session, tenant, row["id"]))
+        for row in rows
+    ]
+
+
+
 def _validated_segment(segment: object) -> dict[str, Any]:
     if not isinstance(segment, Mapping):
         raise AudienceValidationError("each segment must be an object")
@@ -416,6 +436,7 @@ __all__ = [
     "AudienceValidationError",
     "create_profile",
     "get_current",
+    "get_profile_history",
     "replace_segments",
     "update_profile",
 ]
