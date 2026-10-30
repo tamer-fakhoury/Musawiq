@@ -20,6 +20,7 @@ const NAV_HREFS: Partial<Record<(typeof NAV_ITEMS)[number], string>> = {
   المفاهيم: "/concepts",
   التقييم: "/evaluations",
   المقارنة: "/compare",
+  التوصيات: "/recommendations",
   الحملات: "/campaigns",
 };
 

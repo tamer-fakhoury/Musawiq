@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     sales_history_stale_days: int = Field(default=90, ge=1)
     audience_stale_days: int = Field(default=180, ge=1)
     competitive_data_stale_days: int = Field(default=90, ge=1)
+    evidence_freshness_days: int = Field(default=365, ge=1)
 
     @property
     def cors_origin_list(self) -> list[str]:

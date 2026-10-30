@@ -8,6 +8,9 @@ from typing import Any
 from musawiq.jobs.models import JobOutcome
 from musawiq.services.page_generation import run_page_generation_job
 from musawiq.workers.batch_evaluation import run_batch_evaluation_job
+from musawiq.workers.recommendation_generation import (
+    run_recommendation_generation_job,
+)
 
 JobHandler = Callable[[Mapping[str, Any]], JobOutcome | Mapping[str, Any] | Any]
 
@@ -21,6 +24,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "import": noop,
     "batch_evaluation": run_batch_evaluation_job,
     "page_generation": run_page_generation_job,
+    "recommendation_generation": run_recommendation_generation_job,
 }
 
 
