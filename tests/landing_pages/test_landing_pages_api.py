@@ -147,3 +147,69 @@ def test_order_method_is_whatsapp_or_cod(client, tenant):
     )
     assert missing_number.status_code == 422
     assert missing_number.json()["error"]["code"] == "invalid_order_method"
+
+def test_published_page_autosave_does_not_change_live_version(
+    client, tenant, db_engine
+) -> None:
+    from sqlalchemy import text
+
+    created = client.post(
+        "/landing-pages/drafts",
+        json=_payload(
+            tenant,
+            order_method={
+                "type": "whatsapp",
+                "whatsapp_number": "+966500000000",
+                "whatsapp_message_template": "Hello",
+            },
+        ),
+        headers=_headers(tenant),
+    )
+    page_id = created.json()["id"]
+
+    published = client.post(
+        f"/landing-pages/{page_id}/publish",
+        json={"confirm": True},
+        headers=_headers(tenant),
+    )
+    assert published.status_code == 200, published.text
+
+    with db_engine.connect() as conn:
+        before = conn.execute(
+            text(
+                """
+                SELECT published_version_id, current_version_id
+                FROM landing_pages WHERE id = :id
+                """
+            ),
+            {"id": page_id},
+        ).mappings().one()
+        live_content = conn.execute(
+            text("SELECT content FROM page_versions WHERE id = :id"),
+            {"id": before["published_version_id"]},
+        ).scalar_one()
+
+    saved = client.put(
+        f"/landing-pages/{page_id}/draft",
+        json=_payload(tenant, name="Changed after publish"),
+        headers=_headers(tenant),
+    )
+    assert saved.status_code == 200, saved.text
+
+    with db_engine.connect() as conn:
+        after = conn.execute(
+            text(
+                """
+                SELECT published_version_id, current_version_id
+                FROM landing_pages WHERE id = :id
+                """
+            ),
+            {"id": page_id},
+        ).mappings().one()
+        live_content_after = conn.execute(
+            text("SELECT content FROM page_versions WHERE id = :id"),
+            {"id": before["published_version_id"]},
+        ).scalar_one()
+    assert after["published_version_id"] == before["published_version_id"]
+    assert after["current_version_id"] != before["current_version_id"]
+    assert live_content_after == live_content

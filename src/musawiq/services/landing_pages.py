@@ -530,7 +530,6 @@ def save_draft(
             "Only draft or published landing pages can be updated.",
             status_code=409,
         )
-    republish = row["status"] == "published"
     data = _validated_payload(session, payload)
     _assert_images(session, tenant, data["image_file_ids"])
 
@@ -542,13 +541,9 @@ def save_draft(
         {"id": page_id},
     ).scalar_one()
 
-    if row["order_channel_id"] is None:
-        channel_id = _insert_order_channel(
-            session, tenant, page_id, data["order_method"]
-        )
-    else:
-        channel_id = row["order_channel_id"]
-        _update_order_channel(session, tenant, channel_id, data["order_method"])
+    channel_id = _insert_order_channel(
+        session, tenant, page_id, data["order_method"]
+    )
 
     version_id = _insert_version(
         session, tenant, page_id, data, channel_id, version=next_version
@@ -558,11 +553,7 @@ def save_draft(
             """
             UPDATE landing_pages
             SET language = :language, currency = :currency,
-                order_channel_id = :channel_id, current_version_id = :version_id,
-                published_version_id = CASE WHEN :republish
-                    THEN :version_id ELSE published_version_id END,
-                published_at = CASE WHEN :republish
-                    THEN now() ELSE published_at END
+                order_channel_id = :channel_id, current_version_id = :version_id
             WHERE id = :id
             """
         ),
@@ -572,27 +563,9 @@ def save_draft(
             "currency": data["currency"],
             "channel_id": channel_id,
             "version_id": version_id,
-            "republish": republish,
         },
     )
-    if republish:
-        refreshed = _page_row(session, tenant, page_id)
-        enriched = _enriched_content(
-            session, tenant, refreshed, _version_row(session, version_id)
-        )
-        session.execute(
-            text("UPDATE page_versions SET content = :content WHERE id = :id"),
-            {"id": version_id, "content": Jsonb(enriched)},
-        )
-        _audit(
-            session,
-            tenant,
-            action="landing_page.republish",
-            page_id=page_id,
-            after={"version_id": str(version_id)},
-        )
     return _page_out(session, tenant, _page_row(session, tenant, page_id))
-
 
 def get_landing_page(
     session: Session, tenant: TenantContext, page_id: uuid.UUID
@@ -624,15 +597,15 @@ def _version_row(session: Session, version_id: uuid.UUID) -> Mapping[str, Any]:
 
 
 def _channel_for(
-    session: Session, tenant: TenantContext, page: Mapping[str, Any]
+    session: Session, page_id: uuid.UUID, channel_id: object
 ) -> dict[str, Any] | None:
-    if page["order_channel_id"] is None:
+    if channel_id is None:
         return None
     row = session.execute(
         text("SELECT * FROM order_channels WHERE id = :id"),
-        {"id": page["order_channel_id"]},
+        {"id": channel_id},
     ).mappings().one()
-    token = attribution_token(page["id"])
+    token = attribution_token(page_id)
     return {
         "type": row["type"],
         "whatsapp_number": row["whatsapp_number"],
@@ -651,7 +624,6 @@ def _channel_for(
 
 def _enriched_content(
     session: Session,
-    tenant: TenantContext,
     page: Mapping[str, Any],
     version: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -662,7 +634,7 @@ def _enriched_content(
         {"id": page["template_id"]},
     ).mappings().one()
     schema = template["schema"] or PAGE_TEMPLATE_SCHEMA
-    channel = _channel_for(session, tenant, page)
+    channel = _channel_for(session, page["id"], version["order_channel_id"])
     content["template"] = {
         "key": template["key"],
         "version": template["version"],
@@ -709,7 +681,7 @@ def preview(
         raise LandingPageError(
             "not_found", "Version not found for this page.", status_code=404
         )
-    content = _enriched_content(session, tenant, page, version)
+    content = _enriched_content(session, page, version)
     breakpoints = content.get("breakpoints") or PAGE_TEMPLATE_SCHEMA["breakpoints"]
     return {
         "page_id": str(page["id"]),
@@ -742,7 +714,7 @@ def publish(
         )
     version = _version_row(session, page["current_version_id"])
     body = version["content"] or {}
-    channel = _channel_for(session, tenant, page)
+    channel = _channel_for(session, page["id"], version["order_channel_id"])
 
     errors: list[str] = []
     if not body.get("name"):
@@ -761,7 +733,7 @@ def publish(
         verification = verify_channel(session, tenant, page_id)
         errors.extend(verification["errors"])
 
-    enriched = _enriched_content(session, tenant, page, version)
+    enriched = _enriched_content(session, page, version)
     template = session.execute(
         text("SELECT schema FROM page_templates WHERE id = :id"),
         {"id": page["template_id"]},
@@ -779,10 +751,6 @@ def publish(
         )
 
     published_url = f"{PUBLIC_BASE_URL}/p/{page['slug']}"
-    session.execute(
-        text("UPDATE page_versions SET content = :content WHERE id = :id"),
-        {"id": version["id"], "content": Jsonb(enriched)},
-    )
     session.execute(
         text(
             """
@@ -837,32 +805,30 @@ def unpublish(
 
 
 def get_public_page(session: Session, slug: str) -> dict[str, Any] | None:
-    row = session.execute(
+    page = session.execute(
         text(
             """
-            SELECT lp.slug, lp.language, lp.currency, lp.published_at,
-                   pv.content, l.direction
-            FROM landing_pages AS lp
-            JOIN page_versions AS pv ON pv.id = lp.published_version_id
-            JOIN languages AS l ON l.code = lp.language
-            WHERE lp.slug = :slug
-              AND lp.status = 'published'
-              AND lp.deleted_at IS NULL
+            SELECT * FROM landing_pages
+            WHERE slug = :slug
+              AND status = 'published'
+              AND deleted_at IS NULL
+            LIMIT 1
             """
         ),
         {"slug": slug},
     ).mappings().one_or_none()
-    if row is None:
+    if page is None or page["published_version_id"] is None:
         return None
+    version = _version_row(session, page["published_version_id"])
+    content = _enriched_content(session, page, version)
     return {
-        "slug": row["slug"],
-        "language": row["language"],
-        "direction": row["direction"],
-        "currency": row["currency"].strip(),
-        "published_at": _iso(row["published_at"]),
-        "content": row["content"],
+        "slug": page["slug"],
+        "language": page["language"],
+        "direction": content["direction"],
+        "currency": page["currency"].strip(),
+        "published_at": _iso(page["published_at"]),
+        "content": content,
     }
-
 
 def upload_product_image(
     session: Session,
@@ -947,3 +913,6 @@ __all__ = [
     "unpublish",
     "upload_product_image",
 ]
+
+
+

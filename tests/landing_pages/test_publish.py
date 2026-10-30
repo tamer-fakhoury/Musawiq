@@ -138,7 +138,7 @@ def test_publish_returns_https_url_serves_publicly_and_unpublishes(
     assert gone.json()["error"]["code"] == "page_unavailable"
 
 
-def test_update_published_page_creates_new_version_and_republishes(
+def test_update_published_page_creates_draft_then_publish_updates_live(
     client, tenant
 ):
     page_id = _setup(client, tenant)
@@ -155,6 +155,11 @@ def test_update_published_page_creates_new_version_and_republishes(
     assert body["draft_version"] == 2
     assert body["published_url"] == first["published_url"]
 
+    public = client.get(f"/p/{body['slug']}")
+    assert public.json()["content"]["product"]["name"] == "Coffee Maker"
+
+    republished = _publish(client, tenant, page_id)
+    assert republished.status_code == 200, republished.text
     public = client.get(f"/p/{body['slug']}")
     assert public.json()["content"]["product"]["name"] == "Coffee Maker Pro"
 
