@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { ApiError, apiFetch } from "@/lib/api";
@@ -27,6 +27,13 @@ export default function RecommendationsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [converting, setConverting] = useState<ProductIdea | null>(null);
+  const [convertName, setConvertName] = useState("");
+  const [convertDescription, setConvertDescription] = useState("");
+  const [convertPrice, setConvertPrice] = useState("");
+  const [convertCost, setConvertCost] = useState("");
+  const [convertCurrency, setConvertCurrency] = useState("USD");
+  const [convertConfirmed, setConvertConfirmed] = useState(false);
 
   const fetchData = useCallback(async () => {
     const [ideaData, runData] = await Promise.all([
@@ -71,17 +78,36 @@ export default function RecommendationsPage() {
     setError(null);
     setNotice(null);
     try {
+      const idempotencyKey =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : String(Date.now());
       const result = await apiFetch<{
         run_id: string;
         job_id: string;
         status: string;
       }>("/recommendations/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify({ count }),
       });
+      let latest: GenerationRun | null = null;
+      for (let attempt = 0; attempt < 15; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        latest = await apiFetch<GenerationRun>(
+          `/recommendations/runs/${result.run_id}`,
+        );
+        if (latest.status === "succeeded" || latest.status === "failed") {
+          break;
+        }
+      }
       setNotice(
-        `تم إرسال مهمة التوليد (${result.run_id.slice(0, 8)}). حدّث القائمة بعد انتهاء العامل.`,
+        latest
+          ? `حالة التوليد: ${runStatusLabel(latest.status)}.`
+          : "تم إرسال مهمة التوليد.",
       );
       await loadData();
     } catch (generateError) {
@@ -113,6 +139,67 @@ export default function RecommendationsPage() {
       await loadData();
     } catch (updateError) {
       setError(errorMessage(updateError, "تعذر تحديث حالة الفكرة."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startConvert(idea: ProductIdea) {
+    setConverting(idea);
+    setConvertName(idea.name);
+    setConvertDescription(idea.description);
+    setConvertPrice("");
+    setConvertCost("");
+    setConvertCurrency("USD");
+    setConvertConfirmed(false);
+    setError(null);
+    setNotice(null);
+  }
+
+  async function submitConvert(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!converting) {
+      return;
+    }
+    if (!convertConfirmed) {
+      setError("يجب تأكيد التحويل أولاً.");
+      return;
+    }
+    const price = Number(convertPrice);
+    const cost = Number(convertCost);
+    if (!Number.isFinite(price) || price <= 0) {
+      setError("السعر يجب أن يكون أكبر من صفر.");
+      return;
+    }
+    if (!Number.isFinite(cost) || cost < 0) {
+      setError("التكلفة يجب ألا تكون سالبة.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const concept = await apiFetch<{ id: string }>(
+        `/recommendations/ideas/${converting.id}/convert`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            confirm: true,
+            name: convertName,
+            description: convertDescription,
+            price_minor: Math.round(price * 100),
+            cost_minor: Math.round(cost * 100),
+            currency: convertCurrency.trim().toUpperCase(),
+          }),
+        },
+      );
+      setNotice(`تم إنشاء المفهوم ${concept.id.slice(0, 8)}.`);
+      setConverting(null);
+      setConvertConfirmed(false);
+      await loadData();
+    } catch (convertError) {
+      setError(errorMessage(convertError, "تعذر تحويل الفكرة."));
     } finally {
       setBusy(false);
     }
@@ -176,6 +263,114 @@ export default function RecommendationsPage() {
           </div>
         </section>
 
+        {converting ? (
+          <section className="rounded-lg border border-amber-300 bg-white p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">
+                  تحويل «{converting.name}» إلى مفهوم
+                </h2>
+                <p className="mt-1 text-xs text-zinc-500">
+                  الفئة والنيتش مأخوذتان من الفكرة. السعر والتكلفة من إدخالك.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConverting(null)}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+              >
+                إلغاء
+              </button>
+            </div>
+            <form onSubmit={submitConvert} className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700" htmlFor="convert-name">
+                  الاسم
+                </label>
+                <input
+                  id="convert-name"
+                  value={convertName}
+                  onChange={(event) => setConvertName(event.target.value)}
+                  required
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700" htmlFor="convert-description">
+                  الوصف
+                </label>
+                <input
+                  id="convert-description"
+                  value={convertDescription}
+                  onChange={(event) => setConvertDescription(event.target.value)}
+                  required
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700" htmlFor="convert-price">
+                  السعر
+                </label>
+                <input
+                  id="convert-price"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={convertPrice}
+                  onChange={(event) => setConvertPrice(event.target.value)}
+                  required
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700" htmlFor="convert-cost">
+                  التكلفة
+                </label>
+                <input
+                  id="convert-cost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={convertCost}
+                  onChange={(event) => setConvertCost(event.target.value)}
+                  required
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700" htmlFor="convert-currency">
+                  العملة
+                </label>
+                <input
+                  id="convert-currency"
+                  value={convertCurrency}
+                  onChange={(event) => setConvertCurrency(event.target.value)}
+                  maxLength={3}
+                  dir="ltr"
+                  className={fieldClass}
+                />
+              </div>
+              <div className="flex flex-col justify-end gap-3">
+                <label className="flex items-center gap-2 text-sm text-zinc-700">
+                  <input
+                    type="checkbox"
+                    checked={convertConfirmed}
+                    onChange={(event) => setConvertConfirmed(event.target.checked)}
+                  />
+                  أؤكد تحويل الفكرة إلى مسودة مفهوم
+                </label>
+                <button
+                  type="submit"
+                  disabled={busy || !convertConfirmed}
+                  className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {busy ? "جارٍ التحويل…" : "تأكيد التحويل"}
+                </button>
+              </div>
+            </form>
+          </section>
+        ) : null}
+
         <section className="rounded-lg border border-zinc-200 bg-white p-5">
           <h2 className="text-base font-semibold">آخر عمليات التوليد</h2>
           {loading ? (
@@ -235,6 +430,16 @@ export default function RecommendationsPage() {
                         </button>
                       ) : (
                         <>
+                          {idea.state !== "converted" ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => startConvert(idea)}
+                              className="rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white"
+                            >
+                              تحويل إلى مفهوم
+                            </button>
+                          ) : null}
                           {idea.state !== "saved" && idea.state !== "converted" ? (
                             <button
                               type="button"

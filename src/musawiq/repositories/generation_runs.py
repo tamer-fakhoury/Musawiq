@@ -17,6 +17,25 @@ class GenerationRunRepository(TenantScopedRepository):
     def __init__(self, session: Session) -> None:
         super().__init__(session, "generation_runs")
 
+    def get_for_update(
+        self, run_id: object
+    ) -> Mapping[str, Any] | None:
+        tenant = self._tenant()
+        return (
+            self.session.execute(
+                text(
+                    """
+                    SELECT * FROM public.generation_runs
+                    WHERE id = :id AND store_id = :store_id
+                    FOR UPDATE
+                    """
+                ),
+                {"id": run_id, "store_id": tenant.store_id},
+            )
+            .mappings()
+            .one_or_none()
+        )
+
     def insert_run(self, values: Mapping[str, Any]) -> Mapping[str, Any]:
         return self.insert(values)
 

@@ -1,4 +1,4 @@
-﻿"""FR-2.2.1 recommendation generation and idea library."""
+"""FR-2.2.1 recommendation generation and idea library."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 from psycopg.types.json import Jsonb
 from sqlalchemy import text
 
+from musawiq.services import recommendations as recommendation_service
+from musawiq.services.recommendations import _is_duplicate, _normalized
 from musawiq.workers.recommendation_generation import (
     run_recommendation_generation_job,
 )
@@ -399,3 +401,84 @@ def test_idea_library_filters_and_store_scope(
         headers=_headers(other),
     )
     assert other_run.status_code == 404
+
+def test_arabic_dedupe_normalization_preserves_letters() -> None:
+    normalized = _normalized("قَهْوَة عربية")
+    assert normalized
+    assert normalized == _normalized("قهوة عربية")
+    assert _is_duplicate(
+        "قهوة عربية",
+        "مشروب ساخن",
+        [_normalized("قهوة عربية مشروب ساخن")],
+    )
+
+
+def test_failed_generation_rolls_back_partial_ideas(
+    client, tenant, taxonomy, db_engine, monkeypatch
+) -> None:
+    _seed_inputs(db_engine, tenant, taxonomy)
+    created = _generate(client, tenant, count=3)
+    original = recommendation_service.IdeaEvidenceRepository.insert_evidence
+    calls = {"count": 0}
+
+    def flaky(self, values):
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise RuntimeError("internal database detail")
+        return original(self, values)
+
+    monkeypatch.setattr(
+        recommendation_service.IdeaEvidenceRepository,
+        "insert_evidence",
+        flaky,
+    )
+    outcome = _run_job(db_engine, created["job_id"])
+    assert outcome.state == "failed"
+
+    run = client.get(
+        f"/recommendations/runs/{created['run_id']}",
+        headers=_headers(tenant),
+    ).json()
+    assert run["status"] == "failed"
+    assert "internal database detail" not in run["error_message"]
+    assert _ideas(client, tenant, created["run_id"]) == []
+
+
+def test_retried_generation_is_idempotent(
+    client, tenant, taxonomy, db_engine
+) -> None:
+    _seed_inputs(db_engine, tenant, taxonomy)
+    created = _generate(client, tenant, count=2)
+    first = _run_job(db_engine, created["job_id"])
+    assert first.state == "succeeded"
+    ideas = _ideas(client, tenant, created["run_id"])
+    assert len(ideas) == 2
+
+    second = _run_job(db_engine, created["job_id"])
+    assert second.state == "succeeded"
+    assert _ideas(client, tenant, created["run_id"]) == ideas
+
+def test_generate_endpoint_honors_idempotency_key(
+    client, tenant, taxonomy, db_engine
+) -> None:
+    _seed_inputs(db_engine, tenant, taxonomy)
+    headers = {**_headers(tenant), "Idempotency-Key": "recommendation-once"}
+    first = client.post(
+        "/recommendations/generate", json={"count": 2}, headers=headers
+    )
+    second = client.post(
+        "/recommendations/generate", json={"count": 2}, headers=headers
+    )
+    assert first.status_code == 202
+    assert second.status_code == 202
+    assert first.json()["run_id"] == second.json()["run_id"]
+    assert first.json()["job_id"] == second.json()["job_id"]
+
+    with db_engine.connect() as conn:
+        count = conn.execute(
+            text(
+                "SELECT count(*) FROM async_jobs "
+                "WHERE idempotency_key = 'recommendation-once'"
+            )
+        ).scalar_one()
+    assert count == 1

@@ -421,6 +421,11 @@ def _concept_out(row: Mapping[str, Any]) -> dict[str, Any]:
         "image_file_id": (
             str(row["image_file_id"]) if row["image_file_id"] else None
         ),
+        "source_idea_id": (
+            str(row["source_idea_id"])
+            if row.get("source_idea_id") is not None
+            else None
+        ),
         "status": row["status"],
         "version": row["version"],
         "latest_evaluation_id": (
@@ -471,6 +476,7 @@ def create_concept(
     payload: Mapping[str, Any],
     *,
     image: UploadedImage | None = None,
+    source_idea_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Create a draft concept with a computed gross margin."""
 
@@ -486,6 +492,7 @@ def create_concept(
         {
             **values,
             "image_file_id": image_file_id,
+            "source_idea_id": source_idea_id,
             "status": "draft",
             "version": 1,
             "created_by": tenant.user_id,

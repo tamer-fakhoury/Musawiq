@@ -1,13 +1,15 @@
-﻿"""On-demand product idea generation with provenance and deduplication.
+"""On-demand product idea generation with provenance and deduplication.
 
-The MVP generator is deterministic and data-driven: it uses the current niche
-and audience profile, plus historical product sales when available. No external
-trend or competitive source is configured yet, so that input is recorded as
-missing in the snapshot instead of being invented.
+Prototype deviation: this generator is deterministic and rules-based rather
+than AI-backed. It uses the current niche and audience profile, plus historical
+product sales when available. No external trend or competitive source is
+configured yet, so that input is recorded as missing in the snapshot instead of
+being invented. ``MODEL_VERSION`` identifies this rules model honestly.
 """
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 import uuid
@@ -31,6 +33,8 @@ MODEL_VERSION = "rules_v1"
 MAX_REQUESTED_IDEAS = 10
 IDEA_STATES = frozenset({"new", "saved", "dismissed", "converted"})
 SIMILARITY_THRESHOLD = 0.85
+
+logger = logging.getLogger("musawiq.recommendations")
 
 
 class RecommendationError(Exception):
@@ -144,12 +148,11 @@ def _idea_out(
 
 
 def _normalized(value: str) -> str:
-    ascii_value = unicodedata.normalize("NFKD", value).encode(
-        "ascii", "ignore"
-    ).decode("ascii")
-    return " ".join(
-        re.sub(r"[^a-z0-9]+", " ", ascii_value.lower()).split()
-    )
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    normalized = re.sub(r"[\u0610-\u061A\u064B-\u065F\u06D6-\u06ED]", "", normalized)
+    normalized = normalized.replace("\u0640", "")
+    normalized = re.sub(r"[^\w\s]", " ", normalized, flags=re.UNICODE)
+    return " ".join(normalized.split())
 
 
 def _is_duplicate(
@@ -458,6 +461,19 @@ def create_generation_run(
     return _run_out(dict(row))
 
 
+def _safe_error_message(exc: Exception) -> str:
+    if isinstance(
+        exc,
+        (
+            RecommendationGenerationError,
+            RecommendationValidationError,
+            RecommendationNotFound,
+        ),
+    ):
+        return (str(exc).strip() or "Recommendation generation failed.")[:500]
+    return "Recommendation generation failed."
+
+
 def run_generation(
     session: Session,
     tenant: TenantContext,
@@ -465,7 +481,7 @@ def run_generation(
 ) -> dict[str, Any]:
     repository = GenerationRunRepository(session)
     try:
-        run = repository.get(run_id)
+        run = repository.get_for_update(run_id)
     except ValueError as exc:
         raise RecommendationNotFound("Generation run not found") from exc
     if run is None:
@@ -478,7 +494,6 @@ def run_generation(
         run_id,
         {"status": "running", "started_at": now, "error_message": None},
     )
-    snapshot: dict[str, Any] = {"schema_version": 1, "status": "pending"}
     try:
         snapshot = _snapshot(session, tenant, int(run["requested_count"]))
         idea_repository = ProductIdeaRepository(session)
@@ -491,56 +506,83 @@ def run_generation(
             snapshot, blocked, int(run["requested_count"])
         )
         evidence_repository = IdeaEvidenceRepository(session)
-        inserted = []
-        for candidate in candidates:
-            idea = idea_repository.insert_idea(
-                {
-                    "generation_run_id": run["id"],
-                    "name": candidate["name"],
-                    "description": candidate["description"],
-                    "category_id": candidate["category_id"],
-                    "niche_id": candidate["niche_id"],
-                    "rationale": candidate["rationale"],
-                    "state": "new",
-                    "model_version": MODEL_VERSION,
-                }
-            )
-            evidence_repository.insert_evidence(
-                {
-                    "product_idea_id": idea["id"],
-                    "evidence_type": "hypothesis",
-                    "claim": candidate["rationale"],
-                    "source_name": "Rules-based generation",
-                    "source_url": None,
-                    "source_published_at": None,
-                    "retrieved_at": datetime.now(timezone.utc),
-                    "confidence": 0.5,
-                }
-            )
-            inserted.append(idea)
+        inserted = 0
+        with session.begin_nested():
+            for candidate in candidates:
+                idea = idea_repository.insert_idea(
+                    {
+                        "generation_run_id": run["id"],
+                        "name": candidate["name"],
+                        "description": candidate["description"],
+                        "category_id": candidate["category_id"],
+                        "niche_id": candidate["niche_id"],
+                        "rationale": candidate["rationale"],
+                        "state": "new",
+                        "model_version": MODEL_VERSION,
+                    }
+                )
+                evidence_repository.insert_evidence(
+                    {
+                        "product_idea_id": idea["id"],
+                        "evidence_type": "hypothesis",
+                        "claim": candidate["rationale"],
+                        "source_name": "Rules-based generation",
+                        "source_url": None,
+                        "source_published_at": None,
+                        "retrieved_at": datetime.now(timezone.utc),
+                        "confidence": 0.5,
+                    }
+                )
+                blocked.append(
+                    _normalized(
+                        f"{candidate['name']} {candidate['description']}"
+                    )
+                )
+                inserted += 1
         updated = repository.update_run(
             run_id,
             {
                 "status": "succeeded",
                 "input_snapshot": Jsonb(snapshot),
-                "returned_count": len(inserted),
+                "returned_count": inserted,
                 "finished_at": datetime.now(timezone.utc),
                 "error_message": None,
             },
         )
         return _run_out(dict(updated))
     except Exception as exc:
-        repository.update_run(
-            run_id,
-            {
-                "status": "failed",
-                "input_snapshot": Jsonb(snapshot),
-                "error_message": str(exc)[:500],
-                "finished_at": datetime.now(timezone.utc),
-            },
+        logger.exception(
+            "recommendation_generation_failed",
+            extra={"run_id": str(run_id)},
         )
-        raise
+        raise RecommendationGenerationError(
+            _safe_error_message(exc)
+        ) from exc
 
+
+def mark_generation_failed(
+    session: Session,
+    tenant: TenantContext,
+    run_id: uuid.UUID | str,
+    message: str,
+) -> None:
+    repository = GenerationRunRepository(session)
+    try:
+        run = repository.get_for_update(run_id)
+    except ValueError:
+        return
+    if run is None or run["status"] == "succeeded":
+        return
+    repository.update_run(
+        run_id,
+        {
+            "status": "failed",
+            "error_message": (message or "Recommendation generation failed.")[
+                :500
+            ],
+            "finished_at": datetime.now(timezone.utc),
+        },
+    )
 
 def get_generation_run(
     session: Session,
@@ -815,7 +857,9 @@ __all__ = [
     "get_idea",
     "get_ideas",
     "list_generation_runs",
+    "mark_generation_failed",
     "restore_idea",
     "run_generation",
     "save_idea",
 ]
+

@@ -1,4 +1,4 @@
-﻿"""Route wiring smoke test.
+"""Route wiring smoke test.
 
 Tests that build a local FastAPI instance hide wiring gaps: a router can be
 fully tested and still be absent from ``create_app``. This test reads the real
@@ -52,6 +52,7 @@ def test_real_app_registers_every_router():
         "/recommendations/ideas/{idea_id}/save",
         "/recommendations/ideas/{idea_id}/dismiss",
         "/recommendations/ideas/{idea_id}/restore",
+        "/recommendations/ideas/{idea_id}/convert",
         "/audience-profiles",
         "/audience-profiles/current",
         "/audience-profiles/{profile_id}/segments",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import Any
 
@@ -10,7 +11,12 @@ from sqlalchemy import text
 from musawiq.db.session import get_session_factory
 from musawiq.db.tenant import set_local_tenant
 from musawiq.jobs.models import JobOutcome
-from musawiq.services.recommendations import run_generation
+from musawiq.services.recommendations import (
+    mark_generation_failed,
+    run_generation,
+)
+
+logger = logging.getLogger("musawiq.workers.recommendations")
 
 
 def _store_owner(session, store_id) -> Any:
@@ -31,6 +37,29 @@ def _progress(session, job_id, current: int, total: int) -> None:
         ),
         {"id": job_id, "current": current, "total": total},
     )
+
+
+def _mark_failed(
+    job: Mapping[str, Any], run_id: object, message: str
+) -> None:
+    session = get_session_factory()()
+    try:
+        session.begin()
+        requested_by = (job.get("payload") or {}).get("requested_by") or (
+            _store_owner(session, job["store_id"])
+        )
+        tenant = set_local_tenant(
+            session,
+            job["store_id"],
+            requested_by,
+            str((job.get("payload") or {}).get("requested_role") or "owner"),
+        )
+        mark_generation_failed(session, tenant, run_id, message)
+        session.commit()
+    except Exception:
+        session.rollback()
+    finally:
+        session.close()
 
 
 def run_recommendation_generation_job(
@@ -76,14 +105,20 @@ def run_recommendation_generation_job(
             },
         )
     except Exception as exc:
-        try:
-            session.commit()
-        except Exception:
-            session.rollback()
+        session.rollback()
+        logger.exception(
+            "recommendation_generation_job_failed",
+            extra={
+                "job_id": str(job.get("id")),
+                "correlation_id": str(job.get("correlation_id")),
+            },
+        )
+        safe_message = str(exc).strip()[:500] or "Recommendation generation failed."
+        _mark_failed(job, run_id, safe_message)
         return JobOutcome(
             state="failed",
             error_code="generation_failed",
-            error_message=str(exc)[:500] or type(exc).__name__,
+            error_message=safe_message,
         )
     finally:
         session.close()
