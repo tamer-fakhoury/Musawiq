@@ -10,6 +10,9 @@ import {
   generateCopy,
   generatePage,
   getPage,
+  previewPage,
+  publishPage,
+  unpublishPage,
   uploadImage,
   verifyChannel,
   type LandingPage,
@@ -42,6 +45,10 @@ export default function LandingPagesPage() {
     errors: string[];
   } | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [previewViews, setPreviewViews] = useState<{
+    mobile: Record<string, unknown>;
+    desktop: Record<string, unknown>;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -283,6 +290,42 @@ export default function LandingPagesPage() {
             <button
               className={button}
               disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  const views = await previewPage(page.id);
+                  setPreviewViews(views.views);
+                })
+              }
+            >
+              معاينة (جوال/سطح مكتب)
+            </button>
+            <button
+              className={button}
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  const published = await publishPage(page.id);
+                  setPage(published);
+                })
+              }
+            >
+              نشر
+            </button>
+            <button
+              className={button}
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  const unpublished = await unpublishPage(page.id);
+                  setPage(unpublished);
+                })
+              }
+            >
+              إلغاء النشر
+            </button>
+            <button
+              className={button}
+              disabled={busy}
               onClick={() => run(async () => refresh(page.id))}
             >
               تحديث
@@ -290,6 +333,29 @@ export default function LandingPagesPage() {
           </div>
 
           {jobId ? <p className="text-sm">مهمة التوليد: {jobId}</p> : null}
+          {page.published_url && page.status === "published" ? (
+            <p className="text-sm">
+              رابط مباشر:{" "}
+              <a
+                className="text-blue-700 underline"
+                href={page.published_url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {page.published_url}
+              </a>
+            </p>
+          ) : null}
+          {previewViews ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              <pre className="overflow-auto rounded-md bg-zinc-100 p-3 text-xs">
+                {JSON.stringify({ mobile: previewViews.mobile }, null, 2)}
+              </pre>
+              <pre className="overflow-auto rounded-md bg-zinc-100 p-3 text-xs">
+                {JSON.stringify({ desktop: previewViews.desktop }, null, 2)}
+              </pre>
+            </div>
+          ) : null}
           {verification ? (
             <p
               className={`rounded-md px-3 py-2 text-sm ${

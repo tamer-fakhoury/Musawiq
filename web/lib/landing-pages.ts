@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+﻿import { apiFetch } from "./api";
 
 export type LandingPage = {
   id: string;
@@ -10,6 +10,8 @@ export type LandingPage = {
   currency: string;
   draft_version: number | null;
   price_minor: number | null;
+  published_url: string | null;
+  published_at: string | null;
   content: Record<string, unknown> | null;
   image_file_ids: string[];
   generated_by: string | null;
@@ -104,3 +106,32 @@ export function generatePage(id: string): Promise<{ job_id: string }> {
     method: "POST",
   });
 }
+
+export function previewPage(id: string): Promise<{
+  version: number;
+  direction: "ltr" | "rtl";
+  views: { mobile: Record<string, unknown>; desktop: Record<string, unknown> };
+  content: Record<string, unknown>;
+}> {
+  return apiFetch<{
+    version: number;
+    direction: "ltr" | "rtl";
+    views: { mobile: Record<string, unknown>; desktop: Record<string, unknown> };
+    content: Record<string, unknown>;
+  }>(`/landing-pages/${id}/preview`);
+}
+
+export function publishPage(id: string): Promise<LandingPage> {
+  return apiFetch<LandingPage>(`/landing-pages/${id}/publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm: true }),
+  });
+}
+
+export function unpublishPage(id: string): Promise<LandingPage> {
+  return apiFetch<LandingPage>(`/landing-pages/${id}/unpublish`, {
+    method: "POST",
+  });
+}
+

@@ -25,7 +25,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from musawiq.db.tenant import ROLES, TenantContext
 
 PUBLIC_PATHS = frozenset({"/health", "/openapi.json"})
-PUBLIC_PREFIXES = ("/docs", "/redoc")
+PUBLIC_PREFIXES = ("/docs", "/redoc", "/p/")
 CORRELATION_ID_HEADER = "X-Correlation-ID"
 
 

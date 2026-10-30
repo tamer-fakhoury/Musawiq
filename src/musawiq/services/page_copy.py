@@ -99,7 +99,7 @@ def _page_version(session: Session, tenant: TenantContext, page_id: object):
         text(
             """
             SELECT lp.id, lp.language, lp.currency, lp.template_id,
-                   lp.current_version_id, l.direction,
+                   lp.status, lp.current_version_id, l.direction,
                    pv.content, pv.price_minor
             FROM landing_pages AS lp
             JOIN languages AS l ON l.code = lp.language
@@ -122,11 +122,55 @@ def _page_version(session: Session, tenant: TenantContext, page_id: object):
 def _write_copy(session: Session, row: Mapping[str, Any], copy: dict[str, Any]) -> None:
     content = dict(row["content"] or {})
     content["copy"] = copy
+    if row["status"] != "published":
+        session.execute(
+            text(
+                "UPDATE page_versions SET content = :content WHERE id = :id"
+            ),
+            {"id": row["current_version_id"], "content": Jsonb(content)},
+        )
+        return
+
+    next_version = session.execute(
+        text(
+            "SELECT COALESCE(MAX(version), 0) + 1 FROM page_versions "
+            "WHERE landing_page_id = :id"
+        ),
+        {"id": row["id"]},
+    ).scalar_one()
+    version_id = session.execute(
+        text(
+            """
+            INSERT INTO page_versions (
+                store_id, landing_page_id, version, content, price_minor,
+                currency, image_file_ids, order_channel_id, generated_by,
+                model_version, created_by
+            )
+            SELECT store_id, landing_page_id, :version, :content, price_minor,
+                   currency, image_file_ids, order_channel_id, generated_by,
+                   model_version, created_by
+            FROM page_versions
+            WHERE id = :current_version_id
+            RETURNING id
+            """
+        ),
+        {
+            "version": next_version,
+            "content": Jsonb(content),
+            "current_version_id": row["current_version_id"],
+        },
+    ).scalar_one()
     session.execute(
         text(
-            "UPDATE page_versions SET content = :content WHERE id = :id"
+            """
+            UPDATE landing_pages
+            SET current_version_id = :version_id,
+                published_version_id = :version_id,
+                published_at = now()
+            WHERE id = :id
+            """
         ),
-        {"id": row["current_version_id"], "content": Jsonb(content)},
+        {"id": row["id"], "version_id": version_id},
     )
 
 

@@ -19,7 +19,10 @@ from musawiq.services.landing_pages import (
     LandingPageError,
     create_draft,
     get_landing_page,
+    preview as preview_page,
+    publish as publish_page,
     save_draft,
+    unpublish as unpublish_page,
     upload_product_image,
 )
 from musawiq.services.page_copy import (
@@ -77,6 +80,10 @@ class OrderChannelRequest(BaseModel):
     whatsapp_number: str | None = None
     whatsapp_message_template: str | None = None
     cod_form_schema: dict[str, Any] | None = None
+
+
+class PublishRequest(BaseModel):
+    confirm: bool = False
 
 
 def _require_action(action: Action):
@@ -170,6 +177,58 @@ def autosave(
 ):
     try:
         return save_draft(session, tenant, page_id, payload.model_dump())
+    except LandingPageError as exc:
+        return _error(request, exc)
+
+
+@router.get("/{page_id}/preview")
+def preview(
+    page_id: uuid.UUID,
+    request: Request,
+    version_id: uuid.UUID | None = None,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    try:
+        return preview_page(session, tenant, page_id, version_id)
+    except LandingPageError as exc:
+        return _error(request, exc)
+
+
+@router.post("/{page_id}/publish")
+def publish(
+    page_id: uuid.UUID,
+    payload: PublishRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    if not payload.confirm:
+        return _error(
+            request,
+            LandingPageError(
+                "confirmation_required",
+                "Publishing requires explicit confirmation.",
+            ),
+        )
+    try:
+        return publish_page(session, tenant, page_id)
+    except LandingPageError as exc:
+        return _error(request, exc)
+
+
+@router.post("/{page_id}/unpublish")
+def unpublish(
+    page_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        return unpublish_page(session, tenant, page_id)
     except LandingPageError as exc:
         return _error(request, exc)
 

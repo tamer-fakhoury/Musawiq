@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import uuid
 from collections.abc import Mapping
@@ -12,8 +13,18 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from musawiq.db.tenant import TenantContext
-from musawiq.services.order_channels import attribution_token, whatsapp_link
+from musawiq.services.audit import AuditService
+from musawiq.services.order_channels import (
+    attribution_token,
+    verify as verify_channel,
+    whatsapp_link,
+)
+from musawiq.services.page_accessibility import check as accessibility_check
 from musawiq.storage import get_storage
+
+PUBLIC_BASE_URL = os.getenv(
+    "MUSAWIQ_PUBLIC_BASE_URL", "https://pages.musawiq.app"
+).rstrip("/")
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_NAME_LENGTH = 200
@@ -21,6 +32,12 @@ ORDER_METHODS = frozenset({"whatsapp", "cod"})
 RESPONSIVE_TEMPLATE_KEY = "responsive"
 PAGE_TEMPLATE_SCHEMA: dict[str, Any] = {
     "schema_version": 1,
+    "palette": {
+        "background": "#FFFFFF",
+        "text": "#111111",
+        "cta_background": "#111111",
+        "cta_text": "#FFFFFF",
+    },
     "sections": [
         {"type": "image", "field": "image_file_ids", "required": False},
         {"type": "text", "field": "name", "required": True},
@@ -507,10 +524,13 @@ def save_draft(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
     row = _page_row(session, tenant, page_id)
-    if row["status"] != "draft":
+    if row["status"] not in {"draft", "published"}:
         raise LandingPageError(
-            "not_draft", "Only draft landing pages can be autosaved.", status_code=409
+            "not_editable",
+            "Only draft or published landing pages can be updated.",
+            status_code=409,
         )
+    republish = row["status"] == "published"
     data = _validated_payload(session, payload)
     _assert_images(session, tenant, data["image_file_ids"])
 
@@ -538,7 +558,11 @@ def save_draft(
             """
             UPDATE landing_pages
             SET language = :language, currency = :currency,
-                order_channel_id = :channel_id, current_version_id = :version_id
+                order_channel_id = :channel_id, current_version_id = :version_id,
+                published_version_id = CASE WHEN :republish
+                    THEN :version_id ELSE published_version_id END,
+                published_at = CASE WHEN :republish
+                    THEN now() ELSE published_at END
             WHERE id = :id
             """
         ),
@@ -548,8 +572,25 @@ def save_draft(
             "currency": data["currency"],
             "channel_id": channel_id,
             "version_id": version_id,
+            "republish": republish,
         },
     )
+    if republish:
+        refreshed = _page_row(session, tenant, page_id)
+        enriched = _enriched_content(
+            session, tenant, refreshed, _version_row(session, version_id)
+        )
+        session.execute(
+            text("UPDATE page_versions SET content = :content WHERE id = :id"),
+            {"id": version_id, "content": Jsonb(enriched)},
+        )
+        _audit(
+            session,
+            tenant,
+            action="landing_page.republish",
+            page_id=page_id,
+            after={"version_id": str(version_id)},
+        )
     return _page_out(session, tenant, _page_row(session, tenant, page_id))
 
 
@@ -557,6 +598,270 @@ def get_landing_page(
     session: Session, tenant: TenantContext, page_id: uuid.UUID
 ) -> dict[str, Any]:
     return _page_out(session, tenant, _page_row(session, tenant, page_id))
+
+
+def _audit(
+    session: Session,
+    tenant: TenantContext,
+    *,
+    action: str,
+    page_id: uuid.UUID,
+    after: Mapping[str, Any] | None = None,
+) -> None:
+    AuditService(session, tenant).record(
+        action=action,
+        target_type="landing_page",
+        target_id=page_id,
+        after=dict(after or {}),
+    )
+
+
+def _version_row(session: Session, version_id: uuid.UUID) -> Mapping[str, Any]:
+    return session.execute(
+        text("SELECT * FROM page_versions WHERE id = :id"),
+        {"id": version_id},
+    ).mappings().one()
+
+
+def _channel_for(
+    session: Session, tenant: TenantContext, page: Mapping[str, Any]
+) -> dict[str, Any] | None:
+    if page["order_channel_id"] is None:
+        return None
+    row = session.execute(
+        text("SELECT * FROM order_channels WHERE id = :id"),
+        {"id": page["order_channel_id"]},
+    ).mappings().one()
+    token = attribution_token(page["id"])
+    return {
+        "type": row["type"],
+        "whatsapp_number": row["whatsapp_number"],
+        "whatsapp_message_template": row["whatsapp_message_template"],
+        "cod_form_schema": row["cod_form_schema"],
+        "attribution_token": token,
+        "whatsapp_link": (
+            whatsapp_link(
+                row["whatsapp_number"], row["whatsapp_message_template"] or "", token
+            )
+            if row["type"] == "whatsapp"
+            else None
+        ),
+    }
+
+
+def _enriched_content(
+    session: Session,
+    tenant: TenantContext,
+    page: Mapping[str, Any],
+    version: Mapping[str, Any],
+) -> dict[str, Any]:
+    content = dict(version["content"] or {})
+    name = content.get("name") or ""
+    template = session.execute(
+        text("SELECT key, version, schema FROM page_templates WHERE id = :id"),
+        {"id": page["template_id"]},
+    ).mappings().one()
+    schema = template["schema"] or PAGE_TEMPLATE_SCHEMA
+    channel = _channel_for(session, tenant, page)
+    content["template"] = {
+        "key": template["key"],
+        "version": template["version"],
+    }
+    content["sections"] = schema.get("sections", PAGE_TEMPLATE_SCHEMA["sections"])
+    content["breakpoints"] = schema.get(
+        "breakpoints", PAGE_TEMPLATE_SCHEMA["breakpoints"]
+    )
+    content["product"] = {
+        "name": name,
+        "description": content.get("description"),
+        "price_minor": version["price_minor"],
+        "currency": version["currency"].strip(),
+        "image_file_ids": [str(item) for item in version["image_file_ids"]],
+        "target_market": content.get("target_market"),
+    }
+    content["images"] = [
+        {"file_id": str(file_id), "alt": name}
+        for file_id in version["image_file_ids"]
+    ]
+    content["direction"] = session.execute(
+        text("SELECT direction FROM languages WHERE code = :code"),
+        {"code": page["language"]},
+    ).scalar_one()
+    content["palette"] = schema.get("palette", PAGE_TEMPLATE_SCHEMA["palette"])
+    content["order_method"] = channel
+    return content
+
+
+def preview(
+    session: Session,
+    tenant: TenantContext,
+    page_id: uuid.UUID,
+    version_id: uuid.UUID | None = None,
+) -> dict[str, Any]:
+    page = _page_row(session, tenant, page_id)
+    selected = version_id or page["current_version_id"]
+    if selected is None:
+        raise LandingPageError(
+            "no_draft", "Landing page has no content to preview.", status_code=409
+        )
+    version = _version_row(session, selected)
+    if version["landing_page_id"] != page["id"]:
+        raise LandingPageError(
+            "not_found", "Version not found for this page.", status_code=404
+        )
+    content = _enriched_content(session, tenant, page, version)
+    breakpoints = content.get("breakpoints") or PAGE_TEMPLATE_SCHEMA["breakpoints"]
+    return {
+        "page_id": str(page["id"]),
+        "version": version["version"],
+        "version_id": str(version["id"]),
+        "status": page["status"],
+        "language": page["language"],
+        "direction": content["direction"],
+        "currency": page["currency"].strip(),
+        "content": content,
+        "order_method": content["order_method"],
+        "views": {
+            "mobile": breakpoints["mobile"],
+            "desktop": breakpoints["desktop"],
+        },
+    }
+
+
+def publish(
+    session: Session, tenant: TenantContext, page_id: uuid.UUID
+) -> dict[str, Any]:
+    page = _page_row(session, tenant, page_id)
+    if page["status"] not in {"draft", "published"}:
+        raise LandingPageError(
+            "not_publishable", "Landing page cannot be published.", status_code=409
+        )
+    if page["current_version_id"] is None:
+        raise LandingPageError(
+            "incomplete_input", "Add product details before publishing."
+        )
+    version = _version_row(session, page["current_version_id"])
+    body = version["content"] or {}
+    channel = _channel_for(session, tenant, page)
+
+    errors: list[str] = []
+    if not body.get("name"):
+        errors.append("product name is required")
+    if not version["price_minor"] or version["price_minor"] <= 0:
+        errors.append("a positive price is required")
+    if not page["currency"]:
+        errors.append("currency is required")
+    if not page["language"]:
+        errors.append("language is required")
+    if not body.get("target_market"):
+        errors.append("target market is required")
+    if channel is None:
+        errors.append("an order method is required")
+    else:
+        verification = verify_channel(session, tenant, page_id)
+        errors.extend(verification["errors"])
+
+    enriched = _enriched_content(session, tenant, page, version)
+    template = session.execute(
+        text("SELECT schema FROM page_templates WHERE id = :id"),
+        {"id": page["template_id"]},
+    ).scalar_one()
+    errors.extend(
+        accessibility_check(
+            content=enriched,
+            template_schema=template or PAGE_TEMPLATE_SCHEMA,
+            channel=channel,
+        )
+    )
+    if errors:
+        raise LandingPageError(
+            "publish_invalid", "; ".join(dict.fromkeys(errors))
+        )
+
+    published_url = f"{PUBLIC_BASE_URL}/p/{page['slug']}"
+    session.execute(
+        text("UPDATE page_versions SET content = :content WHERE id = :id"),
+        {"id": version["id"], "content": Jsonb(enriched)},
+    )
+    session.execute(
+        text(
+            """
+            UPDATE landing_pages
+            SET status = 'published',
+                published_version_id = :version_id,
+                published_at = now(),
+                published_url = :url
+            WHERE id = :id AND store_id = :store_id
+            """
+        ),
+        {
+            "id": page["id"],
+            "store_id": tenant.store_id,
+            "version_id": version["id"],
+            "url": published_url,
+        },
+    )
+    _audit(
+        session,
+        tenant,
+        action="landing_page.publish",
+        page_id=page["id"],
+        after={"version_id": str(version["id"]), "published_url": published_url},
+    )
+    return _page_out(session, tenant, _page_row(session, tenant, page_id))
+
+
+def unpublish(
+    session: Session, tenant: TenantContext, page_id: uuid.UUID
+) -> dict[str, Any]:
+    page = _page_row(session, tenant, page_id)
+    if page["status"] != "published":
+        raise LandingPageError(
+            "not_published", "Landing page is not published.", status_code=409
+        )
+    session.execute(
+        text(
+            "UPDATE landing_pages SET status = 'unpublished', published_at = NULL "
+            "WHERE id = :id AND store_id = :store_id"
+        ),
+        {"id": page["id"], "store_id": tenant.store_id},
+    )
+    _audit(
+        session,
+        tenant,
+        action="landing_page.unpublish",
+        page_id=page["id"],
+        after={"status": "unpublished"},
+    )
+    return _page_out(session, tenant, _page_row(session, tenant, page_id))
+
+
+def get_public_page(session: Session, slug: str) -> dict[str, Any] | None:
+    row = session.execute(
+        text(
+            """
+            SELECT lp.slug, lp.language, lp.currency, lp.published_at,
+                   pv.content, l.direction
+            FROM landing_pages AS lp
+            JOIN page_versions AS pv ON pv.id = lp.published_version_id
+            JOIN languages AS l ON l.code = lp.language
+            WHERE lp.slug = :slug
+              AND lp.status = 'published'
+              AND lp.deleted_at IS NULL
+            """
+        ),
+        {"slug": slug},
+    ).mappings().one_or_none()
+    if row is None:
+        return None
+    return {
+        "slug": row["slug"],
+        "language": row["language"],
+        "direction": row["direction"],
+        "currency": row["currency"].strip(),
+        "published_at": _iso(row["published_at"]),
+        "content": row["content"],
+    }
 
 
 def upload_product_image(
@@ -629,11 +934,16 @@ __all__ = [
     "MAX_IMAGE_BYTES",
     "ORDER_METHODS",
     "PAGE_TEMPLATE_SCHEMA",
+    "PUBLIC_BASE_URL",
     "RESPONSIVE_TEMPLATE_KEY",
     "LandingPageError",
     "create_draft",
     "ensure_responsive_template",
     "get_landing_page",
+    "get_public_page",
+    "preview",
+    "publish",
     "save_draft",
+    "unpublish",
     "upload_product_image",
 ]

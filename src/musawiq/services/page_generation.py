@@ -197,10 +197,19 @@ def run_page_generation_job(job: Mapping[str, Any]) -> JobOutcome:
         ).scalar_one()
         session.execute(
             text(
-                "UPDATE landing_pages SET current_version_id = :id WHERE id = :page"
+                "UPDATE landing_pages SET current_version_id = :id "
+                "WHERE id = :page"
             ),
             {"id": new_version_id, "page": page["id"]},
         )
+        if page["status"] == "published":
+            session.execute(
+                text(
+                    "UPDATE landing_pages SET published_version_id = :id, "
+                    "published_at = now() WHERE id = :page"
+                ),
+                {"id": new_version_id, "page": page["id"]},
+            )
         session.commit()
         return JobOutcome(
             state="succeeded",
