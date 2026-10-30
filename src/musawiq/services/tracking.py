@@ -130,7 +130,10 @@ def _variation(
             JOIN ad_sets AS s ON s.id = v.adset_id
             WHERE v.id = :id AND v.store_id = :store_id
               AND s.campaign_id = :campaign_id
-              AND (:adset_id IS NULL OR v.adset_id = :adset_id)
+              AND (
+                  CAST(:adset_id AS uuid) IS NULL
+                  OR v.adset_id = CAST(:adset_id AS uuid)
+              )
             """
         ),
         {
@@ -334,7 +337,8 @@ def check_publication(
                 "SELECT 1 FROM tracking_links "
                 "WHERE token = :token AND campaign_id = :campaign_id "
                 "AND store_id = :store_id "
-                "AND (:variation_id IS NULL OR ad_variation_id = :variation_id)"
+                "AND (CAST(:variation_id AS uuid) IS NULL "
+                "OR ad_variation_id = CAST(:variation_id AS uuid))"
             ),
             {
                 "token": token,

@@ -39,6 +39,7 @@ from musawiq.services.copy import (
     CopyValidationError,
     suggest_copy,
 )
+from musawiq.services.preflight import PreflightError, validate as preflight
 from musawiq.services.tracking import (
     TrackingError,
     check_publication,
@@ -308,6 +309,25 @@ def patch_ad_variation(
         )
     except CampaignError as exc:
         _raise_for(exc)
+
+
+@router.get("/campaigns/{campaign_id}/preflight")
+def campaign_preflight(
+    campaign_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    try:
+        return preflight(session, tenant, campaign_id)
+    except PreflightError as exc:
+        return error_response(
+            request,
+            status_code=exc.status_code,
+            code=exc.code,
+            message=exc.message,
+        )
 
 
 @router.post("/campaigns/{campaign_id}/tracking-links", status_code=201)
