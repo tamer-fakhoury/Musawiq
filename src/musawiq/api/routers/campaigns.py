@@ -39,6 +39,12 @@ from musawiq.services.copy import (
     CopyValidationError,
     suggest_copy,
 )
+from musawiq.services.tracking import (
+    TrackingError,
+    check_publication,
+    generate_tracking_link,
+    list_tracking_links,
+)
 
 router = APIRouter(tags=["campaigns"])
 
@@ -102,6 +108,23 @@ class GenerateVariationsRequest(BaseModel):
     notes: str | None = None
 
 
+class TrackingLinkRequest(BaseModel):
+    adset_id: uuid.UUID | None = None
+    ad_variation_id: uuid.UUID | None = None
+    landing_page_id: uuid.UUID | None = None
+    post_id: uuid.UUID | None = None
+    utm_source: str | None = None
+    utm_medium: str | None = None
+    utm_campaign: str | None = None
+    utm_content: str | None = None
+    utm_term: str | None = None
+
+
+class PublicationCheckRequest(BaseModel):
+    adset_id: uuid.UUID | None = None
+    ad_variation_id: uuid.UUID | None = None
+
+
 def _require_action(action: Action):
     def dependency(request: Request) -> None:
         tenant = getattr(request.state, "tenant", None)
@@ -142,6 +165,15 @@ def _variation_error(request: Request, exc: AdVariationError):
         status_code=status_code,
         code=code,
         message=message,
+    )
+
+
+def _tracking_error(request: Request, exc: TrackingError):
+    return error_response(
+        request,
+        status_code=exc.status_code,
+        code=exc.code,
+        message=exc.message,
     )
 
 
@@ -276,6 +308,61 @@ def patch_ad_variation(
         )
     except CampaignError as exc:
         _raise_for(exc)
+
+
+@router.post("/campaigns/{campaign_id}/tracking-links", status_code=201)
+def create_tracking_link(
+    campaign_id: uuid.UUID,
+    request: Request,
+    body: TrackingLinkRequest | None = None,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        return generate_tracking_link(
+            session, tenant, campaign_id, (body or TrackingLinkRequest()).model_dump()
+        )
+    except TrackingError as exc:
+        return _tracking_error(request, exc)
+
+
+@router.get("/campaigns/{campaign_id}/tracking-links")
+def read_tracking_links(
+    campaign_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    try:
+        return list_tracking_links(session, tenant, campaign_id)
+    except TrackingError as exc:
+        return _tracking_error(request, exc)
+
+
+@router.post("/campaigns/{campaign_id}/publication-check")
+def publication_check(
+    campaign_id: uuid.UUID,
+    request: Request,
+    body: PublicationCheckRequest | None = None,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    payload = body.model_dump() if body else {}
+    try:
+        result = check_publication(session, tenant, campaign_id, payload)
+    except TrackingError as exc:
+        return _tracking_error(request, exc)
+    if not result["valid"]:
+        return error_response(
+            request,
+            status_code=422,
+            code="tracking_invalid",
+            message="; ".join(result["errors"]),
+        )
+    return result
 
 
 @router.post("/campaigns/{campaign_id}/variations/generate", status_code=201)

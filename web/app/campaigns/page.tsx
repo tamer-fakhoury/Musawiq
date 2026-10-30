@@ -70,8 +70,7 @@ export default function CampaignsPage() {
     };
   }, []);
 
-  async function openCampaign(id: string) {
-    setSelectedId(id);
+  async function openCampaign(id: string) {    setSelectedId(id);
     setDetail(null);
     setDetailError(false);
     setDetailLoading(true);
@@ -82,6 +81,22 @@ export default function CampaignsPage() {
     } finally {
       setDetailLoading(false);
     }
+  }
+
+  async function createTrackingLink() {
+    if (!detail) return;
+    const adSet = detail.ad_sets?.[0];
+    const variation = adSet?.variations?.[0];
+    if (!adSet || !variation) return;
+    await apiFetch(`/campaigns/${detail.id}/tracking-links`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        adset_id: adSet.id,
+        ad_variation_id: variation.id,
+      }),
+    });
+    await openCampaign(detail.id);
   }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -356,6 +371,33 @@ export default function CampaignsPage() {
                   <p className="mt-1 text-sm text-zinc-600">
                     الهدف: {detail.objective}
                   </p>
+                  <div className="mt-2 text-sm text-zinc-600">
+                    <p>
+                      المنتج:{" "}
+                      {detail.product ? detail.product.name : "غير مرتبط"}
+                    </p>
+                    <p>
+                      صفحة الهبوط:{" "}
+                      {detail.landing_pages && detail.landing_pages.length > 0
+                        ? detail.landing_pages[0].slug
+                        : "غير مرتبطة"}
+                    </p>
+                    {detail.tracking_links &&
+                    detail.tracking_links.length > 0 ? (
+                      <p className="break-all">
+                        رابط التتبع:{" "}
+                        {detail.tracking_links[0].destination_url}
+                      </p>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => createTrackingLink()}
+                        className="mt-2 rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+                      >
+                        توليد رابط تتبع
+                      </button>
+                    )}
+                  </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Link
                       href={`/campaigns/${detail.id}/signals`}

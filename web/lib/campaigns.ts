@@ -46,6 +46,20 @@ export type MetricSnapshot = {
 export type CampaignDetail = Campaign & {
   ad_sets?: AdSet[];
   signals?: MetricSnapshot[];
+  product?: { id: string; name: string } | null;
+  landing_pages?: {
+    id: string;
+    slug: string;
+    status: string;
+    published_url: string | null;
+  }[];
+  tracking_links?: {
+    id: string;
+    token: string;
+    destination_url: string;
+    ad_variation_id: string | null;
+    landing_page_id: string | null;
+  }[];
 };
 
 export const PROVIDERS = [

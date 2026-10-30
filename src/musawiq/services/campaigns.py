@@ -710,6 +710,63 @@ def get_campaign(
         }
         for adset in adsets
     ]
+
+    product = session.execute(
+        text(
+            "SELECT pc.id, pc.name FROM tests AS t "
+            "JOIN product_concepts AS pc ON pc.id = t.product_concept_id "
+            "WHERE t.id = :test_id AND t.store_id = :store_id"
+        ),
+        {"test_id": campaign["test_id"], "store_id": tenant.store_id},
+    ).mappings().one_or_none()
+    result["product"] = (
+        {"id": str(product["id"]), "name": product["name"]} if product else None
+    )
+
+    pages = session.execute(
+        text(
+            "SELECT id, slug, status, published_url FROM landing_pages "
+            "WHERE test_id = :test_id AND store_id = :store_id "
+            "AND deleted_at IS NULL ORDER BY created_at, id"
+        ),
+        {"test_id": campaign["test_id"], "store_id": tenant.store_id},
+    ).mappings().all()
+    result["landing_pages"] = [
+        {
+            "id": str(page["id"]),
+            "slug": page["slug"],
+            "status": page["status"],
+            "published_url": page["published_url"],
+        }
+        for page in pages
+    ]
+
+    links = session.execute(
+        text(
+            "SELECT id, token, destination_url, ad_variation_id, landing_page_id "
+            "FROM tracking_links WHERE campaign_id = :campaign_id "
+            "AND store_id = :store_id ORDER BY created_at, id"
+        ),
+        {"campaign_id": campaign_uuid, "store_id": tenant.store_id},
+    ).mappings().all()
+    result["tracking_links"] = [
+        {
+            "id": str(link["id"]),
+            "token": link["token"],
+            "destination_url": link["destination_url"],
+            "ad_variation_id": (
+                str(link["ad_variation_id"])
+                if link["ad_variation_id"]
+                else None
+            ),
+            "landing_page_id": (
+                str(link["landing_page_id"])
+                if link["landing_page_id"]
+                else None
+            ),
+        }
+        for link in links
+    ]
     return result
 
 
