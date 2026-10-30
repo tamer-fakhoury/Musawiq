@@ -28,6 +28,12 @@ from musawiq.services.page_copy import (
     update_copy,
 )
 from musawiq.services.page_generation import request_generation
+from musawiq.services.order_channels import (
+    OrderChannelError,
+    configure as configure_order_channel,
+    describe as describe_order_channel,
+    verify as verify_order_channel,
+)
 
 router = APIRouter(prefix="/landing-pages", tags=["landing-pages"])
 
@@ -66,6 +72,13 @@ class UpdateCopyRequest(BaseModel):
     body: str | None = None
 
 
+class OrderChannelRequest(BaseModel):
+    type: Literal["whatsapp", "cod"]
+    whatsapp_number: str | None = None
+    whatsapp_message_template: str | None = None
+    cod_form_schema: dict[str, Any] | None = None
+
+
 def _require_action(action: Action):
     def dependency(request: Request) -> None:
         tenant = getattr(request.state, "tenant", None)
@@ -87,6 +100,15 @@ def _error(request: Request, exc: LandingPageError):
 
 
 def _copy_error(request: Request, exc: PageCopyError):
+    return error_response(
+        request,
+        status_code=exc.status_code,
+        code=exc.code,
+        message=exc.message,
+    )
+
+
+def _order_error(request: Request, exc: OrderChannelError):
     return error_response(
         request,
         status_code=exc.status_code,
@@ -150,6 +172,51 @@ def autosave(
         return save_draft(session, tenant, page_id, payload.model_dump())
     except LandingPageError as exc:
         return _error(request, exc)
+
+
+@router.get("/{page_id}/order-channel")
+def read_order_channel(
+    page_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    try:
+        return describe_order_channel(session, tenant, page_id)
+    except OrderChannelError as exc:
+        return _order_error(request, exc)
+
+
+@router.put("/{page_id}/order-channel")
+def save_order_channel(
+    page_id: uuid.UUID,
+    payload: OrderChannelRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        return configure_order_channel(
+            session, tenant, page_id, payload.model_dump()
+        )
+    except OrderChannelError as exc:
+        return _order_error(request, exc)
+
+
+@router.post("/{page_id}/order-channel/verify")
+def check_order_channel(
+    page_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.READ)),
+):
+    try:
+        return verify_order_channel(session, tenant, page_id)
+    except OrderChannelError as exc:
+        return _order_error(request, exc)
 
 
 @router.post("/{page_id}/copy")

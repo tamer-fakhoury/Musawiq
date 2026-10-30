@@ -62,12 +62,14 @@ def test_draft_captures_product_fields_image_and_order_method(client, tenant):
         "description": "Compact espresso machine",
         "target_market": "SA",
     }
-    assert body["order_method"] == {
-        "type": "whatsapp",
-        "whatsapp_number": "+966500000000",
-        "whatsapp_message_template": None,
-        "cod_form_schema": None,
-    }
+    assert body["order_method"]["type"] == "whatsapp"
+    assert body["order_method"]["whatsapp_number"] == "+966500000000"
+    assert body["order_method"]["whatsapp_message_template"] is None
+    assert body["order_method"]["cod_form_schema"] is None
+    assert body["order_method"]["attribution_token"].startswith("lpt_")
+    assert body["order_method"]["whatsapp_link"].startswith(
+        "https://wa.me/966500000000?text="
+    )
 
 
 def test_image_type_is_limited(client, tenant):

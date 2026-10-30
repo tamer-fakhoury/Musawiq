@@ -12,6 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from musawiq.db.tenant import TenantContext
+from musawiq.services.order_channels import attribution_token, whatsapp_link
 from musawiq.storage import get_storage
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -417,6 +418,16 @@ def _page_out(
                 "whatsapp_number": channel["whatsapp_number"],
                 "whatsapp_message_template": channel["whatsapp_message_template"],
                 "cod_form_schema": channel["cod_form_schema"],
+                "attribution_token": attribution_token(row["id"]),
+                "whatsapp_link": (
+                    whatsapp_link(
+                        channel["whatsapp_number"],
+                        channel["whatsapp_message_template"] or "",
+                        attribution_token(row["id"]),
+                    )
+                    if channel["type"] == "whatsapp"
+                    else None
+                ),
             }
             if channel
             else None
