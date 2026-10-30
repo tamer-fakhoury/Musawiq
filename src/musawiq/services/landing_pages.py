@@ -396,6 +396,10 @@ def _page_out(
         "slug": row["slug"],
         "status": row["status"],
         "language": row["language"],
+        "direction": session.execute(
+            text("SELECT direction FROM languages WHERE code = :code"),
+            {"code": row["language"]},
+        ).scalar_one(),
         "currency": row["currency"].strip(),
         "published_url": row["published_url"],
         "published_at": _iso(row["published_at"]),

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from musawiq.api.deps import get_session, get_tenant
+from musawiq.ai.providers import get_provider
 from musawiq.auth.permissions import Action
 from musawiq.auth.service import AuthorizationService
 from musawiq.db.tenant import TenantContext
@@ -20,6 +21,11 @@ from musawiq.services.landing_pages import (
     get_landing_page,
     save_draft,
     upload_product_image,
+)
+from musawiq.services.page_copy import (
+    PageCopyError,
+    generate_copy,
+    update_copy,
 )
 from musawiq.services.page_generation import request_generation
 
@@ -49,6 +55,17 @@ class CreateDraftRequest(DraftRequest):
     template_id: uuid.UUID | None = None
 
 
+class GenerateCopyRequest(BaseModel):
+    force: bool = False
+
+
+class UpdateCopyRequest(BaseModel):
+    headline: str | None = None
+    description: str | None = None
+    cta_label: str | None = None
+    body: str | None = None
+
+
 def _require_action(action: Action):
     def dependency(request: Request) -> None:
         tenant = getattr(request.state, "tenant", None)
@@ -67,6 +84,22 @@ def _error(request: Request, exc: LandingPageError):
         code=exc.code,
         message=exc.message,
     )
+
+
+def _copy_error(request: Request, exc: PageCopyError):
+    return error_response(
+        request,
+        status_code=exc.status_code,
+        code=exc.code,
+        message=exc.message,
+    )
+
+
+def _provider(request: Request):
+    injected = getattr(request.app.state, "ai_provider", None)
+    if injected is not None:
+        return injected
+    return get_provider(request.app.state.settings)
 
 
 @router.post("/images", status_code=201)
@@ -117,6 +150,48 @@ def autosave(
         return save_draft(session, tenant, page_id, payload.model_dump())
     except LandingPageError as exc:
         return _error(request, exc)
+
+
+@router.post("/{page_id}/copy")
+def create_copy(
+    page_id: uuid.UUID,
+    payload: GenerateCopyRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        return generate_copy(
+            session,
+            tenant,
+            page_id,
+            force=payload.force,
+            provider=_provider(request),
+        )
+    except PageCopyError as exc:
+        return _copy_error(request, exc)
+
+
+@router.put("/{page_id}/copy")
+def edit_copy(
+    page_id: uuid.UUID,
+    payload: UpdateCopyRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    fields = payload.model_dump(exclude_unset=True)
+    if not fields:
+        return _copy_error(
+            request,
+            PageCopyError("invalid_copy", "At least one copy field is required."),
+        )
+    try:
+        return update_copy(session, tenant, page_id, fields=fields)
+    except PageCopyError as exc:
+        return _copy_error(request, exc)
 
 
 @router.post("/{page_id}/generate", status_code=202)
