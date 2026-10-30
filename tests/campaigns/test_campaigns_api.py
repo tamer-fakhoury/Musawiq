@@ -42,6 +42,7 @@ def _create_adset(client, tenant, campaign_id: str, **overrides):
     payload = {
         "name": "Saudi audience",
         "targeting": {
+            "schema_version": 1,
             "locations": ["SA"],
             "age_min": 18,
             "age_max": 35,

@@ -15,6 +15,15 @@ from sqlalchemy.orm import Session
 from musawiq.db.tenant import TenantContext
 
 BUDGET_TYPES = frozenset({"daily", "total"})
+PLATFORM_MIN_BUDGET_MINOR = {
+    "meta": 500,
+    "google": 100,
+    "tiktok": 500,
+    "snapchat": 500,
+}
+DEFAULT_MIN_BUDGET_MINOR = 100
+MIN_TARGETING_AGE = 0
+MAX_TARGETING_AGE = 120
 CAMPAIGN_STATUS_TRANSITIONS = {"draft": "active", "active": "paused"}
 VARIATION_STATUSES = frozenset({"draft", "approved", "discarded"})
 
@@ -146,10 +155,91 @@ def _reference_exists(
     ).first() is not None
 
 
-def _validate_targeting(targeting: object) -> dict[str, Any]:
+def _validate_countries(session: Session, locations: list) -> None:
+    codes: list[str] = []
+    for location in locations:
+        if isinstance(location, str):
+            code = location
+        elif isinstance(location, Mapping) and isinstance(
+            location.get("country_code"), str
+        ):
+            code = location["country_code"]
+        else:
+            raise CampaignValidationError(
+                "targeting.locations must be country codes or objects with country_code"
+            )
+        if code not in codes:
+            codes.append(code)
+    if not codes:
+        return
+    known = session.execute(
+        text(
+            "SELECT code FROM countries WHERE code = ANY(:codes) AND is_active"
+        ),
+        {"codes": codes},
+    ).scalars().all()
+    unknown = [code for code in codes if code not in set(known)]
+    if unknown:
+        raise CampaignValidationError(
+            f"targeting.locations has unknown countries: {', '.join(unknown)}"
+        )
+
+
+def _validate_saved_audience(
+    session: Session, tenant: TenantContext, value: Mapping[str, Any]
+) -> None:
+    profile_id = value.get("audience_profile_id")
+    if profile_id is not None:
+        profile_uuid = _coerce_uuid(profile_id, "targeting.audience_profile_id")
+        exists = session.execute(
+            text(
+                "SELECT 1 FROM audience_profiles "
+                "WHERE id = :id AND store_id = :store_id"
+            ),
+            {"id": profile_uuid, "store_id": tenant.store_id},
+        ).first()
+        if exists is None:
+            raise CampaignValidationError(
+                "targeting.audience_profile_id is not valid for this store"
+            )
+    for key, table in (
+        ("audience_segment_ids", "audience_segments"),
+        ("audience_profile_ids", "audience_profiles"),
+    ):
+        if key not in value:
+            continue
+        ids = value[key]
+        if not isinstance(ids, list) or not all(
+            isinstance(item, str) for item in ids
+        ):
+            raise CampaignValidationError(
+                f"targeting.{key} must be a list of UUID strings"
+            )
+        for raw in ids:
+            record_id = _coerce_uuid(raw, f"targeting.{key}")
+            exists = session.execute(
+                text(
+                    f"SELECT 1 FROM {table} "
+                    "WHERE id = :id AND store_id = :store_id"
+                ),
+                {"id": record_id, "store_id": tenant.store_id},
+            ).first()
+            if exists is None:
+                raise CampaignValidationError(
+                    f"targeting.{key} contains an id outside this store"
+                )
+
+
+def _validate_targeting(
+    session: Session, tenant: TenantContext, targeting: object
+) -> dict[str, Any]:
     if not isinstance(targeting, Mapping):
         raise CampaignValidationError("targeting must be an object")
     value = dict(targeting)
+    if value.get("schema_version") != 1:
+        raise CampaignValidationError(
+            "targeting.schema_version must be 1"
+        )
     for key in ("locations", "genders", "interests", "languages"):
         if key in value and not isinstance(value[key], list):
             raise CampaignValidationError(f"targeting.{key} must be a list")
@@ -169,10 +259,16 @@ def _validate_targeting(targeting: object) -> dict[str, Any]:
             raise CampaignValidationError(
                 "targeting.age_min and targeting.age_max must be integers"
             )
-        if age_min > age_max:
+        if (
+            age_min < MIN_TARGETING_AGE
+            or age_max > MAX_TARGETING_AGE
+            or age_min > age_max
+        ):
             raise CampaignValidationError(
-                "targeting.age_min must not exceed targeting.age_max"
+                "targeting ages must satisfy 0 <= age_min <= age_max <= 120"
             )
+    _validate_countries(session, value.get("locations", []))
+    _validate_saved_audience(session, tenant, value)
     return value
 
 
@@ -208,6 +304,11 @@ def create_campaign(
     if budget_type not in BUDGET_TYPES:
         raise CampaignValidationError("budget_type must be daily or total")
     budget_minor = _positive_int(payload.get("budget_minor"), "budget_minor")
+    minimum = PLATFORM_MIN_BUDGET_MINOR.get(provider, DEFAULT_MIN_BUDGET_MINOR)
+    if budget_minor < minimum:
+        raise CampaignValidationError(
+            f"budget_minor must be at least {minimum} for {provider}"
+        )
 
     currency = _required_text(payload.get("currency"), "currency").upper()
     if len(currency) != 3 or not _reference_exists(
@@ -264,7 +365,7 @@ def create_adset(
     campaign_uuid = campaign["id"]
 
     name = _required_text(payload.get("name"), "name")
-    targeting = _validate_targeting(payload.get("targeting"))
+    targeting = _validate_targeting(session, tenant, payload.get("targeting"))
 
     budget_type = payload.get("budget_type")
     if budget_type is not None and budget_type not in BUDGET_TYPES:
@@ -272,6 +373,14 @@ def create_adset(
     budget_minor = payload.get("budget_minor")
     if budget_minor is not None:
         budget_minor = _positive_int(budget_minor, "budget_minor")
+        minimum = PLATFORM_MIN_BUDGET_MINOR.get(
+            campaign["provider"], DEFAULT_MIN_BUDGET_MINOR
+        )
+        if budget_minor < minimum:
+            raise CampaignValidationError(
+                f"budget_minor must be at least {minimum} for "
+                f"{campaign['provider']}"
+            )
         if budget_type is None:
             budget_type = campaign["budget_type"]
 

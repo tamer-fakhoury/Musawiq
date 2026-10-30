@@ -102,7 +102,10 @@ def _campaign_and_adset(client, tenant):
     campaign_id = campaign.json()["id"]
     adset = client.post(
         f"/campaigns/{campaign_id}/adsets",
-        json={"name": "Ad Set", "targeting": {"country": "SA"}},
+        json={
+            "name": "Ad Set",
+            "targeting": {"schema_version": 1, "country": "SA"},
+        },
         headers=_headers(tenant),
     )
     assert adset.status_code == 201
