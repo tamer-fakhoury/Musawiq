@@ -45,11 +45,28 @@ class TenantProvider(Protocol):
 
 
 class DevHeaderTenantProvider:
-    """Temporary development provider reading identity headers."""
+    """Temporary development provider reading identity headers.
+
+    When ``default_store_id`` and ``default_user_id`` are configured, requests
+    without tenant headers fall back to that demo identity. This keeps browser
+    navigation (for example Swagger UI) usable during local development. The
+    application factory refuses this provider in production, so the fallback
+    cannot be reached there.
+    """
+
+    def __init__(
+        self,
+        default_store_id: str | None = None,
+        default_user_id: str | None = None,
+        default_role: str | None = None,
+    ) -> None:
+        self.default_store_id = default_store_id
+        self.default_user_id = default_user_id
+        self.default_role = default_role
 
     def resolve(self, request: Request) -> TenantContext:
-        store_header = request.headers.get("X-Store-Id")
-        user_header = request.headers.get("X-User-Id")
+        store_header = request.headers.get("X-Store-Id") or self.default_store_id
+        user_header = request.headers.get("X-User-Id") or self.default_user_id
         if not store_header or not user_header:
             raise TenantResolutionError(
                 "X-Store-Id and X-User-Id headers are required"
@@ -63,7 +80,11 @@ class DevHeaderTenantProvider:
                 "X-Store-Id and X-User-Id must be valid UUIDs"
             ) from exc
 
-        role = (request.headers.get("X-User-Role") or "analyst").strip().lower()
+        role = (
+            request.headers.get("X-User-Role")
+            or self.default_role
+            or "analyst"
+        ).strip().lower()
         if role not in ROLES:
             raise TenantResolutionError(
                 "X-User-Role must be one of owner, manager, analyst"

@@ -1,4 +1,4 @@
-"""Public read access for published landing pages (FR-3.1.5).
+﻿"""Public read access for published landing pages (FR-3.1.5).
 
 Published pages are served by an unauthenticated route. Row-level security is
 still enforced, so this revision adds read-only policies that expose exactly the
@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from alembic import op
 
-revision = "0020"
-down_revision = "0019"
+revision = "0021"
+down_revision = "0020"
 branch_labels = None
 depends_on = None
 

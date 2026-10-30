@@ -43,7 +43,10 @@ function demoHeaders(init?: HeadersInit): Headers {
   const headers = new Headers(init);
   const storeId = process.env.NEXT_PUBLIC_DEMO_STORE_ID;
   const userId = process.env.NEXT_PUBLIC_DEMO_USER_ID;
-  const role = process.env.NEXT_PUBLIC_DEMO_USER_ROLE || "owner";
+  const role =
+    process.env.NEXT_PUBLIC_DEMO_USER_ROLE ||
+    process.env.NEXT_PUBLIC_DEMO_ROLE ||
+    "owner";
 
   if (storeId) {
     headers.set("X-Store-Id", storeId);

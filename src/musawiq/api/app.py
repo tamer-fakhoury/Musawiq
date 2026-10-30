@@ -61,7 +61,21 @@ def create_app(tenant_provider: TenantProvider | None = None) -> FastAPI:
     development provider without changing the middleware or dependencies.
     """
     settings = get_settings()
-    provider = tenant_provider or DevHeaderTenantProvider()
+    if settings.allow_dev_tenant_fallback and settings.app_env != "development":
+        raise ConfigurationError(
+            "MUSAWIQ_ALLOW_DEV_TENANT_FALLBACK is only valid when "
+            "MUSAWIQ_APP_ENV=development."
+        )
+    if tenant_provider is not None:
+        provider = tenant_provider
+    elif settings.allow_dev_tenant_fallback:
+        provider = DevHeaderTenantProvider(
+            default_store_id=settings.dev_store_id,
+            default_user_id=settings.dev_user_id,
+            default_role=settings.dev_user_role,
+        )
+    else:
+        provider = DevHeaderTenantProvider()
 
     if settings.app_env == "production" and isinstance(
         provider, DevHeaderTenantProvider

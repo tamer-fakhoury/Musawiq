@@ -1,7 +1,7 @@
 [project]
 name = "musawiq"
 version = "0.0.0"
-description = "Musawiq product-testing platform — database layer"
+description = "Musawiq product-testing platform - database layer"
 requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.13,<2",
@@ -25,15 +25,10 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = [
-    "scripts",
-    "musawiq",
-    "musawiq.api",
-    "musawiq.api.routers",
-    "musawiq.db",
-    "musawiq.repositories",
-]
-package-dir = { "musawiq" = "src/musawiq", "musawiq.api" = "src/musawiq/api", "musawiq.api.routers" = "src/musawiq/api/routers", "musawiq.db" = "src/musawiq/db", "musawiq.repositories" = "src/musawiq/repositories" }
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = [".", "src"]

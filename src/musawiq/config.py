@@ -38,6 +38,10 @@ class Settings(BaseSettings):
         default="http://localhost:3000,http://127.0.0.1:3000",
         min_length=1,
     )
+    dev_store_id: str | None = Field(default=None)
+    dev_user_id: str | None = Field(default=None)
+    dev_user_role: str = Field(default="owner", min_length=1)
+    allow_dev_tenant_fallback: bool = Field(default=False)
     ai_provider: str = Field(default="groq", min_length=1)
     groq_api_key: str | None = Field(default=None)
     groq_model: str = Field(
