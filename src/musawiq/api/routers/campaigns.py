@@ -16,6 +16,10 @@ from musawiq.auth.permissions import Action
 from musawiq.auth.service import AuthorizationService
 from musawiq.db.tenant import TenantContext
 from musawiq.middleware.errors import error_response
+from musawiq.services.ad_variations import (
+    AdVariationError,
+    generate_variations,
+)
 from musawiq.services.campaigns import (
     CampaignError,
     CampaignNotFound,
@@ -92,6 +96,12 @@ class SuggestCopyRequest(BaseModel):
     notes: str | None = None
 
 
+class GenerateVariationsRequest(BaseModel):
+    adset_id: uuid.UUID
+    count: int = Field(default=3, ge=1, le=5)
+    notes: str | None = None
+
+
 def _require_action(action: Action):
     def dependency(request: Request) -> None:
         tenant = getattr(request.state, "tenant", None)
@@ -116,6 +126,23 @@ def _provider(request: Request):
     if injected is not None:
         return injected
     return get_provider(request.app.state.settings)
+
+
+def _variation_error(request: Request, exc: AdVariationError):
+    if exc.code == "not_found":
+        status_code, code, message = 404, "not_found", "Resource not found."
+    elif exc.code == "ai_unavailable":
+        status_code, code, message = 503, "ai_unavailable", exc.message
+    elif exc.code == "ai_invalid_output":
+        status_code, code, message = 502, "ai_invalid_output", exc.message
+    else:
+        status_code, code, message = exc.status_code, exc.code, exc.message
+    return error_response(
+        request,
+        status_code=status_code,
+        code=code,
+        message=message,
+    )
 
 
 def _copy_error(request: Request, exc: Exception):
@@ -249,6 +276,27 @@ def patch_ad_variation(
         )
     except CampaignError as exc:
         _raise_for(exc)
+
+
+@router.post("/campaigns/{campaign_id}/variations/generate", status_code=201)
+def generate_ad_variations(
+    campaign_id: uuid.UUID,
+    request: Request,
+    body: GenerateVariationsRequest,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.WRITE)),
+):
+    try:
+        return generate_variations(
+            session,
+            tenant,
+            campaign_id,
+            body.model_dump(),
+            provider=_provider(request),
+        )
+    except AdVariationError as exc:
+        return _variation_error(request, exc)
 
 
 @router.post("/campaigns/{campaign_id}/variations/suggest")

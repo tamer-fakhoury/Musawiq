@@ -80,7 +80,7 @@ class PageCopyError(Exception):
         super().__init__(message)
 
 
-def _reject_claims(*values: str) -> None:
+def reject_claims(*values: str) -> None:
     for value in values:
         for kind, pattern in _CLAIM_PATTERNS:
             if pattern.search(value):
@@ -234,7 +234,7 @@ def generate_copy(
             status_code=502,
         ) from exc
 
-    _reject_claims(
+    reject_claims(
         result.headline, result.description, result.cta_label, result.body
     )
     copy = {
@@ -277,7 +277,7 @@ def update_copy(
             )
         merged[key] = value.strip()
 
-    _reject_claims(*(merged[key] for key in allowed))
+    reject_claims(*(merged[key] for key in allowed))
     copy = {
         **existing,
         **merged,
@@ -293,5 +293,6 @@ __all__ = [
     "PageCopyError",
     "SYSTEM_PROMPT",
     "generate_copy",
+    "reject_claims",
     "update_copy",
 ]
