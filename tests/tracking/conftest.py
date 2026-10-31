@@ -1,4 +1,4 @@
-"""Fixtures for first-party visitor tracking (FR-4.1.2) tests."""
+"""Fixtures for first-party tracking and COD orders (FR-4.1.2 / FR-4.1.4)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import subprocess
 import sys
 import uuid
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
@@ -15,6 +15,7 @@ import psycopg
 import pytest
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
+from psycopg.types.json import Jsonb
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
@@ -30,8 +31,13 @@ load_dotenv(ROOT / ".env")
 class Site:
     store_id: uuid.UUID
     user_id: uuid.UUID
+    page_id: uuid.UUID
+    concept_id: uuid.UUID
     page_slug: str
     draft_slug: str
+    test_id: uuid.UUID
+    campaign_id: uuid.UUID
+    tracking_token: str
 
 
 def _libpq_url(url: str) -> str:
@@ -94,15 +100,31 @@ def db_engine(migrated_db_url: str) -> Iterator[Engine]:
 
 
 def _seed_site(engine: Engine) -> Site:
+    concept_id = uuid.uuid4()
     site = Site(
         store_id=uuid.uuid4(),
         user_id=uuid.uuid4(),
+        page_id=uuid.uuid4(),
+        concept_id=concept_id,
         page_slug=f"landing-{uuid.uuid4().hex[:8]}",
         draft_slug=f"draft-{uuid.uuid4().hex[:8]}",
+        test_id=uuid.uuid4(),
+        campaign_id=uuid.uuid4(),
+        tracking_token=f"tl_{uuid.uuid4().hex[:20]}",
     )
     category_id = uuid.uuid4()
-    concept_id = uuid.uuid4()
     suffix = uuid.uuid4().hex[:12]
+    content = {
+        "schema_version": 1,
+        "name": "Tracked Product",
+        "target_market": "SA",
+        "product": {
+            "name": "Tracked Product",
+            "price_minor": 5000,
+            "currency": "USD",
+            "target_market": "SA",
+        },
+    }
     with engine.begin() as conn:
         conn.execute(
             text(
@@ -122,7 +144,7 @@ def _seed_site(engine: Engine) -> Site:
                     onboarding_status
                 ) VALUES (
                     :id, :owner_user_id, 'Tracking Store', :slug, 'active',
-                    'USD', 'en', 'UTC', 'US', 'completed'
+                    'USD', 'en', 'UTC', 'SA', 'completed'
                 )
                 """
             ),
@@ -160,6 +182,49 @@ def _seed_site(engine: Engine) -> Site:
                 "created_by": site.user_id,
             },
         )
+        conn.execute(
+            text(
+                """
+                INSERT INTO tests (
+                    id, store_id, product_concept_id, name, status,
+                    primary_conversion, currency, total_budget_minor,
+                    daily_budget_minor, planned_start_at, planned_end_at,
+                    created_by
+                ) VALUES (
+                    :id, :store_id, :concept_id, 'Tracked Test', 'draft',
+                    'cod_order', 'USD', 100000, 10000, now(),
+                    now() + interval '30 days', :created_by
+                )
+                """
+            ),
+            {
+                "id": site.test_id,
+                "store_id": site.store_id,
+                "concept_id": concept_id,
+                "created_by": site.user_id,
+            },
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO campaigns (
+                    id, store_id, test_id, provider, name, objective, status,
+                    budget_type, budget_minor, currency, start_at, end_at,
+                    created_by
+                ) VALUES (
+                    :id, :store_id, :test_id, 'meta', 'Tracked Campaign',
+                    'conversions', 'draft', 'daily', 5000, 'USD', now(),
+                    now() + interval '30 days', :created_by
+                )
+                """
+            ),
+            {
+                "id": site.campaign_id,
+                "store_id": site.store_id,
+                "test_id": site.test_id,
+                "created_by": site.user_id,
+            },
+        )
         template_id = conn.execute(
             text(
                 """
@@ -170,25 +235,33 @@ def _seed_site(engine: Engine) -> Site:
             ),
             {"key": f"tracking-{suffix}"},
         ).scalar_one()
+        page_ids: dict[str, uuid.UUID] = {}
         for slug, status in (
             (site.page_slug, "published"),
             (site.draft_slug, "draft"),
         ):
-            conn.execute(
+            page_ids[slug] = conn.execute(
                 text(
                     """
                     INSERT INTO landing_pages (
-                        store_id, product_concept_id, slug, status, template_id,
-                        language, currency, published_url
+                        id, store_id, product_concept_id, test_id, slug, status,
+                        template_id, language, currency, published_url
                     ) VALUES (
-                        :store_id, :concept_id, :slug, :status, :template_id,
-                        'en', 'USD', :url
+                        :id, :store_id, :concept_id, :test_id, :slug, :status,
+                        :template_id, 'en', 'USD', :url
                     )
+                    RETURNING id
                     """
                 ),
                 {
+                    "id": (
+                        site.page_id
+                        if status == "published"
+                        else uuid.uuid4()
+                    ),
                     "store_id": site.store_id,
                     "concept_id": concept_id,
+                    "test_id": site.test_id,
                     "slug": slug,
                     "status": status,
                     "template_id": template_id,
@@ -198,8 +271,59 @@ def _seed_site(engine: Engine) -> Site:
                         else None
                     ),
                 },
-            )
-    return site
+            ).scalar_one()
+        version_id = conn.execute(
+            text(
+                """
+                INSERT INTO page_versions (
+                    store_id, landing_page_id, version, content, price_minor,
+                    currency, generated_by, created_by
+                ) VALUES (
+                    :store_id, :page_id, 1, :content, 5000, 'USD', 'manual',
+                    :created_by
+                )
+                RETURNING id
+                """
+            ),
+            {
+                "store_id": site.store_id,
+                "page_id": page_ids[site.page_slug],
+                "content": Jsonb(content),
+                "created_by": site.user_id,
+            },
+        ).scalar_one()
+        conn.execute(
+            text(
+                "UPDATE landing_pages SET current_version_id = :version_id, "
+                "published_version_id = :version_id WHERE id = :page_id"
+            ),
+            {
+                "version_id": version_id,
+                "page_id": page_ids[site.page_slug],
+            },
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO tracking_links (
+                    store_id, test_id, campaign_id, landing_page_id, token,
+                    utm_source, utm_medium, utm_campaign, destination_url
+                ) VALUES (
+                    :store_id, :test_id, :campaign_id, :page_id, :token,
+                    'meta', 'paid_social', 'tracked', :url
+                )
+                """
+            ),
+            {
+                "store_id": site.store_id,
+                "test_id": site.test_id,
+                "campaign_id": site.campaign_id,
+                "page_id": page_ids[site.page_slug],
+                "token": site.tracking_token,
+                "url": f"https://pages.musawiq.app/p/{site.page_slug}",
+            },
+        )
+    return replace(site, page_id=page_ids[site.page_slug])
 
 
 @pytest.fixture()

@@ -10,6 +10,13 @@ from pydantic import BaseModel
 
 from musawiq.db.session import get_session_factory
 from musawiq.middleware.errors import error_response
+from musawiq.middleware.tenant import get_correlation_id
+from musawiq.services.cod_orders import (
+    CodFieldError,
+    CodOrderError,
+    DuplicateOrderError,
+    submit_cod_order,
+)
 from musawiq.services.landing_pages import get_public_page
 from musawiq.services.visitor_tracking import (
     VisitorTrackingError,
@@ -48,6 +55,19 @@ class TrackEventRequest(BaseModel):
 class ConsentRequest(BaseModel):
     session_id: str | None = None
     consent_state: str
+
+
+class CodOrderRequest(BaseModel):
+    session_id: str | None = None
+    customer_name: str
+    customer_phone: str
+    customer_address: str
+    quantity: int = 1
+    variant: str | None = None
+    notes: str | None = None
+    product_id: str | None = None
+    website: str | None = None
+    form_started_at: str | None = None
 
 
 def _ip_hash(request: Request) -> str:
@@ -179,6 +199,60 @@ def track_consent(slug: str, payload: ConsentRequest, request: Request):
     finally:
         session.close()
     return result
+
+
+@router.post("/p/{slug}/cod-orders", status_code=201)
+def submit_order(slug: str, payload: CodOrderRequest, request: Request):
+    data = payload.model_dump(exclude_none=True)
+    if not data.get("session_id"):
+        data["session_id"] = request.cookies.get("msq_sid")
+    session = get_session_factory()()
+    try:
+        session.begin()
+        result = submit_cod_order(
+            session,
+            slug,
+            data,
+            user_agent=request.headers.get("User-Agent"),
+        )
+        session.commit()
+    except CodFieldError as exc:
+        session.rollback()
+        return JSONResponse(
+            {
+                "error": {
+                    "code": exc.code,
+                    "message": exc.message,
+                    "correlation_id": get_correlation_id(request),
+                    "fields": exc.fields,
+                }
+            },
+            status_code=exc.status_code,
+        )
+    except DuplicateOrderError as exc:
+        session.rollback()
+        return JSONResponse(
+            {
+                "error": {
+                    "code": exc.code,
+                    "message": exc.message,
+                    "correlation_id": get_correlation_id(request),
+                },
+                "order_id": str(exc.order_id),
+            },
+            status_code=exc.status_code,
+        )
+    except CodOrderError as exc:
+        session.rollback()
+        return error_response(
+            request,
+            status_code=exc.status_code,
+            code=exc.code,
+            message=exc.message,
+        )
+    finally:
+        session.close()
+    return JSONResponse(result, status_code=201)
 
 
 __all__ = ["router"]
