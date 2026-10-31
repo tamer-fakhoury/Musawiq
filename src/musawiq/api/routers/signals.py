@@ -99,3 +99,7 @@ def list_campaign_signals(
 
 
 __all__ = ["router"]
+
+from musawiq.api.routers.deposits import router as deposits_router
+
+router.include_router(deposits_router)
