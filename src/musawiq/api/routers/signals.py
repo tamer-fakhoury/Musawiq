@@ -121,3 +121,6 @@ router.include_router(demand_estimates_router)
 from musawiq.api.routers.unit_economics import router as unit_economics_router
 
 router.include_router(unit_economics_router)
+from musawiq.api.routers.investment import router as investment_router
+
+router.include_router(investment_router)
