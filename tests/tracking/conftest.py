@@ -272,6 +272,15 @@ def _seed_site(engine: Engine) -> Site:
                     ),
                 },
             ).scalar_one()
+        conn.execute(
+            text(
+                "UPDATE tests SET landing_page_id = :page_id WHERE id = :id"
+            ),
+            {
+                "page_id": page_ids[site.page_slug],
+                "id": site.test_id,
+            },
+        )
         version_id = conn.execute(
             text(
                 """

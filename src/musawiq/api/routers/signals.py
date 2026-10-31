@@ -109,3 +109,6 @@ router.include_router(verdicts_router)
 from musawiq.api.routers.decision_rules import router as decision_rules_router
 
 router.include_router(decision_rules_router)
+from musawiq.api.routers.verdict_evaluation import router as verdict_evaluation_router
+
+router.include_router(verdict_evaluation_router)
