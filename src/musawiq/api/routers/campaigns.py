@@ -40,6 +40,11 @@ from musawiq.services.copy import (
     suggest_copy,
 )
 from musawiq.services.preflight import PreflightError, validate as preflight
+from musawiq.services.publication import (
+    AdPlatformClient,
+    PublicationError,
+    publish_campaign,
+)
 from musawiq.services.tracking import (
     TrackingError,
     check_publication,
@@ -126,6 +131,11 @@ class PublicationCheckRequest(BaseModel):
     ad_variation_id: uuid.UUID | None = None
 
 
+class PublishCampaignRequest(BaseModel):
+    confirm: bool = False
+    approved_by: uuid.UUID | None = None
+
+
 def _require_action(action: Action):
     def dependency(request: Request) -> None:
         tenant = getattr(request.state, "tenant", None)
@@ -166,6 +176,19 @@ def _variation_error(request: Request, exc: AdVariationError):
         status_code=status_code,
         code=code,
         message=message,
+    )
+
+
+def _platform_client(request: Request) -> AdPlatformClient | None:
+    return getattr(request.app.state, "ad_platform_client", None)
+
+
+def _publication_error(request: Request, exc: PublicationError):
+    return error_response(
+        request,
+        status_code=exc.status_code,
+        code=exc.code,
+        message=exc.message,
     )
 
 
@@ -309,6 +332,29 @@ def patch_ad_variation(
         )
     except CampaignError as exc:
         _raise_for(exc)
+
+
+@router.post("/campaigns/{campaign_id}/publish")
+def publish_campaign_endpoint(
+    campaign_id: uuid.UUID,
+    request: Request,
+    body: PublishCampaignRequest | None = None,
+    session: Session = Depends(get_session),
+    tenant: TenantContext = Depends(get_tenant),
+    _: None = Depends(_require_action(Action.SUBMIT_CAMPAIGN)),
+):
+    payload = body or PublishCampaignRequest()
+    try:
+        return publish_campaign(
+            session,
+            tenant,
+            campaign_id,
+            confirm=payload.confirm,
+            approved_by=payload.approved_by,
+            client=_platform_client(request),
+        )
+    except PublicationError as exc:
+        return _publication_error(request, exc)
 
 
 @router.get("/campaigns/{campaign_id}/preflight")
