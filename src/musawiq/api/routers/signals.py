@@ -112,3 +112,6 @@ router.include_router(decision_rules_router)
 from musawiq.api.routers.verdict_evaluation import router as verdict_evaluation_router
 
 router.include_router(verdict_evaluation_router)
+from musawiq.api.routers.test_extensions import router as test_extensions_router
+
+router.include_router(test_extensions_router)

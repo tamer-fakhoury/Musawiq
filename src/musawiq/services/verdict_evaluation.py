@@ -11,7 +11,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from musawiq.db.tenant import TenantContext
+from musawiq.services.attribution import attribution_coverage
 from musawiq.services.decision_rules import resolve_rule_set
+
+DEFAULT_ATTRIBUTION_COVERAGE_MIN = 0.8
 
 
 class VerdictError(Exception):
@@ -36,7 +39,13 @@ def _test(session: Session, tenant: TenantContext, test_id: object):
     return row
 
 
-def evaluate(snapshot: Mapping[str, Any], rule_set: Mapping[str, Any]) -> dict[str, Any]:
+def evaluate(
+    snapshot: Mapping[str, Any],
+    rule_set: Mapping[str, Any],
+    *,
+    tracking_events: int | None = None,
+    attribution_coverage_value: float | None = None,
+) -> dict[str, Any]:
     """Pure, deterministic rule evaluation; no randomness or clock access."""
     trace: list[dict[str, Any]] = []
     limitations: list[str] = []
@@ -60,6 +69,34 @@ def evaluate(snapshot: Mapping[str, Any], rule_set: Mapping[str, Any]) -> dict[s
         limitations.append(
             f"data completeness is {completeness}, expected 1.0"
         )
+
+    if tracking_events is not None:
+        tracked = int(tracking_events)
+        tracking_ok = record("tracking_events", 1, tracked, tracked > 0)
+        if not tracking_ok:
+            sufficiency_ok = False
+            limitations.append("no tracking events were recorded")
+
+    if attribution_coverage_value is not None:
+        coverage = float(attribution_coverage_value)
+        coverage_threshold = float(
+            (rule_set.get("rules") or {}).get(
+                "min_attribution_coverage",
+                DEFAULT_ATTRIBUTION_COVERAGE_MIN,
+            )
+        )
+        coverage_ok = record(
+            "min_attribution_coverage",
+            coverage_threshold,
+            coverage,
+            coverage >= coverage_threshold,
+        )
+        if not coverage_ok:
+            sufficiency_ok = False
+            limitations.append(
+                f"attribution coverage is {coverage:.2%}, below the "
+                f"minimum {coverage_threshold:.2%}"
+            )
 
     for field, observed_field in (
         ("min_spend_minor", "spend_minor"),
@@ -152,16 +189,34 @@ def evaluate(snapshot: Mapping[str, Any], rule_set: Mapping[str, Any]) -> dict[s
 
 
 def evaluate_verdict(
-    session: Session, tenant: TenantContext, test_id: object
+    session: Session,
+    tenant: TenantContext,
+    test_id: object,
+    *,
+    snapshot_id: object = None,
+    extra_trace: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     test = _test(session, tenant, test_id)
-    snapshot = session.execute(
-        text(
-            "SELECT * FROM test_result_snapshots WHERE store_id = :store_id "
-            "AND test_id = :test_id ORDER BY captured_at DESC, id DESC LIMIT 1"
-        ),
-        {"store_id": tenant.store_id, "test_id": test["id"]},
-    ).mappings().one_or_none()
+    if snapshot_id is not None:
+        snapshot = session.execute(
+            text(
+                "SELECT * FROM test_result_snapshots "
+                "WHERE id = :id AND test_id = :test_id AND store_id = :store_id"
+            ),
+            {
+                "id": uuid.UUID(str(snapshot_id)),
+                "test_id": test["id"],
+                "store_id": tenant.store_id,
+            },
+        ).mappings().one_or_none()
+    else:
+        snapshot = session.execute(
+            text(
+                "SELECT * FROM test_result_snapshots WHERE store_id = :store_id "
+                "AND test_id = :test_id ORDER BY captured_at DESC, id DESC LIMIT 1"
+            ),
+            {"store_id": tenant.store_id, "test_id": test["id"]},
+        ).mappings().one_or_none()
     if snapshot is None:
         raise VerdictError(
             "no_snapshot",
@@ -182,7 +237,34 @@ def evaluate_verdict(
             status_code=409,
         )
 
-    result = evaluate(snapshot, rule_set)
+    tracking_events = session.execute(
+        text(
+            "SELECT count(*) FROM events "
+            "WHERE store_id = :store_id AND test_id = :test_id "
+            "AND occurred_at >= :start AND occurred_at < :end"
+        ),
+        {
+            "store_id": tenant.store_id,
+            "test_id": test["id"],
+            "start": snapshot["period_start"],
+            "end": snapshot["period_end"],
+        },
+    ).scalar_one()
+    coverage = attribution_coverage(
+        session,
+        tenant.store_id,
+        test_id=test["id"],
+        since=snapshot["period_start"],
+        until=snapshot["period_end"],
+    )
+    result = evaluate(
+        snapshot,
+        rule_set,
+        tracking_events=tracking_events,
+        attribution_coverage_value=coverage["coverage_percentage"] / 100,
+    )
+    if extra_trace:
+        result["rule_trace"].update(extra_trace)
     row = session.execute(
         text(
             """
