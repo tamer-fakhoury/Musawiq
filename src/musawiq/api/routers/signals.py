@@ -115,3 +115,6 @@ router.include_router(verdict_evaluation_router)
 from musawiq.api.routers.test_extensions import router as test_extensions_router
 
 router.include_router(test_extensions_router)
+from musawiq.api.routers.demand_estimates import router as demand_estimates_router
+
+router.include_router(demand_estimates_router)
