@@ -169,7 +169,7 @@ def _snapshot(session: Session, tenant: TenantContext, test_id):
     return row
 
 
-def _profile(
+def load_profile(
     session: Session,
     tenant: TenantContext,
     test_id,
@@ -254,7 +254,7 @@ def create_demand_estimate(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
     snapshot = _snapshot(session, tenant, test_id)
-    profile = _profile(session, tenant, test_id, payload)
+    profile = load_profile(session, tenant, test_id, payload)
     result = estimate(snapshot, profile, payload.get("assumptions"))
 
     version = session.execute(
@@ -340,4 +340,5 @@ __all__ = [
     "DemandEstimateError",
     "create_demand_estimate",
     "estimate",
+    "load_profile",
 ]
