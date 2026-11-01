@@ -1090,6 +1090,15 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("infeasibility_reason", "text"),
         ("created_at", "timestamptz"),
     ],
+    "worker_heartbeats": [
+        ("id", "uuid"),
+        ("worker_name", "text"),
+        ("status", "text"),
+        ("processed_jobs", "integer"),
+        ("failed_jobs", "integer"),
+        ("started_at", "timestamptz"),
+        ("last_heartbeat_at", "timestamptz"),
+    ],
 }
 
 # Extensions that must be installed.

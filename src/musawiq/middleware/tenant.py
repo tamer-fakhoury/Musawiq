@@ -36,6 +36,7 @@ from musawiq.db.tenant import ROLES, TenantContext
 PUBLIC_PATHS = frozenset(
     {
         "/health",
+        "/health/workers",
         "/openapi.json",
         "/auth/signup",
         "/auth/login",

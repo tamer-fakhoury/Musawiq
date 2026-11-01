@@ -44,6 +44,31 @@ def claim_next(session: Session) -> Mapping[str, Any] | None:
     ).mappings().one_or_none()
 
 
+def claim_next_system(session: Session) -> Mapping[str, Any] | None:
+    """Claim one queued system job (``store_id IS NULL``) without a tenant."""
+    return session.execute(
+        text(
+            """
+            WITH candidate AS (
+                SELECT id
+                FROM async_jobs
+                WHERE state = 'queued' AND store_id IS NULL
+                ORDER BY created_at, id
+                FOR UPDATE SKIP LOCKED
+                LIMIT 1
+            )
+            UPDATE async_jobs AS job
+            SET state = 'running',
+                started_at = now(),
+                attempt_count = job.attempt_count + 1
+            FROM candidate
+            WHERE job.id = candidate.id
+            RETURNING job.*
+            """
+        )
+    ).mappings().one_or_none()
+
+
 def _safe_error_message(exc: Exception) -> str:
     message = str(exc).strip() or type(exc).__name__
     return message[:500]
@@ -52,13 +77,13 @@ def _safe_error_message(exc: Exception) -> str:
 def _finish(
     session: Session,
     job_id: Any,
+    job_id_store: Any = None,
     *,
     state: str,
     result: Any = None,
     error_code: str | None = None,
     error_message: str | None = None,
 ) -> Mapping[str, Any]:
-    tenant = get_tenant(session)
     result_json = (
         json.dumps(result, default=str) if result is not None else None
     )
@@ -72,7 +97,7 @@ def _finish(
                 error_message = :error_message,
                 finished_at = now()
             WHERE id = :id
-              AND store_id = :store_id
+              AND store_id IS NOT DISTINCT FROM :store_id
             RETURNING *
             """
         ),
@@ -82,7 +107,7 @@ def _finish(
             "error_code": error_code,
             "error_message": error_message,
             "id": job_id,
-            "store_id": tenant.store_id,
+            "store_id": job_id_store,
         },
     ).mappings().one()
 
@@ -94,6 +119,7 @@ def run_job(session: Session, job: Mapping[str, Any]) -> Mapping[str, Any]:
         return _finish(
             session,
             job["id"],
+            job_id_store=job.get("store_id"),
             state="failed",
             error_code="unknown_job_type",
             error_message=f"No handler registered for job type {job['job_type']!r}",
@@ -105,6 +131,7 @@ def run_job(session: Session, job: Mapping[str, Any]) -> Mapping[str, Any]:
         return _finish(
             session,
             job["id"],
+            job_id_store=job.get("store_id"),
             state="failed",
             error_code="handler_error",
             error_message=_safe_error_message(exc),
@@ -116,6 +143,7 @@ def run_job(session: Session, job: Mapping[str, Any]) -> Mapping[str, Any]:
             return _finish(
                 session,
                 job["id"],
+                job_id_store=job.get("store_id"),
                 state="failed",
                 error_code=outcome.error_code or "handler_failed",
                 error_message=outcome.error_message or "Job handler failed",
@@ -123,14 +151,26 @@ def run_job(session: Session, job: Mapping[str, Any]) -> Mapping[str, Any]:
         return _finish(
             session,
             job["id"],
+            job_id_store=job.get("store_id"),
             state=state,
             result=outcome.result,
         )
 
     if outcome is None:
-        return _finish(session, job["id"], state="succeeded")
+        return _finish(
+            session,
+            job["id"],
+            job_id_store=job.get("store_id"),
+            state="succeeded",
+        )
 
-    return _finish(session, job["id"], state="succeeded", result=outcome)
+    return _finish(
+        session,
+        job["id"],
+        job_id_store=job.get("store_id"),
+        state="succeeded",
+        result=outcome,
+    )
 
 
 class JobWorker:
@@ -146,4 +186,4 @@ class JobWorker:
         return run_job(self.session, job)
 
 
-__all__ = ["JobWorker", "TERMINAL_STATES", "claim_next", "run_job"]
+__all__ = ["JobWorker", "TERMINAL_STATES", "claim_next", "claim_next_system", "run_job"]

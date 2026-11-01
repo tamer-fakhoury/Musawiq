@@ -20,12 +20,29 @@ def noop(job: Mapping[str, Any]) -> JobOutcome:
     return JobOutcome(result={"ok": True})
 
 
+def not_implemented(job_type: str) -> JobHandler:
+    """Return a handler that fails visibly instead of silently queueing."""
+
+    def handler(job: Mapping[str, Any]) -> JobOutcome:
+        return JobOutcome(
+            state="failed",
+            error_code="handler_not_implemented",
+            error_message=f"No handler is registered for {job_type!r}.",
+        )
+
+    return handler
+
+
 JOB_HANDLERS: dict[str, JobHandler] = {
     "import": noop,
     "batch_evaluation": run_batch_evaluation_job,
     "page_generation": run_page_generation_job,
     "email_verification": noop,
     "recommendation_generation": run_recommendation_generation_job,
+    "integration_sync": not_implemented("integration_sync"),
+    "ad_publication": not_implemented("ad_publication"),
+    "metric_sync": not_implemented("metric_sync"),
+    "content_generation": not_implemented("content_generation"),
 }
 
 
@@ -41,6 +58,7 @@ __all__ = [
     "JOB_HANDLERS",
     "JobHandler",
     "noop",
+    "not_implemented",
     "register_handler",
     "unregister_handler",
 ]
