@@ -17,7 +17,7 @@ def test_missing_database_url_fails_fast(monkeypatch) -> None:
 def test_dev_tenant_fallback_requires_explicit_development_opt_in(monkeypatch) -> None:
     from musawiq.api.app import create_app
     from musawiq.db.session import dispose_engine
-    from musawiq.middleware.tenant import DevHeaderTenantProvider
+    from musawiq.middleware.tenant import SessionTenantProvider
 
     monkeypatch.setenv(
         "MUSAWIQ_DATABASE_URL",
@@ -30,8 +30,8 @@ def test_dev_tenant_fallback_requires_explicit_development_opt_in(monkeypatch) -
     get_settings.cache_clear()
     try:
         app = create_app()
-        assert isinstance(app.state.tenant_provider, DevHeaderTenantProvider)
-        assert app.state.tenant_provider.default_store_id is None
+        assert isinstance(app.state.tenant_provider, SessionTenantProvider)
+        assert app.state.tenant_provider.allow_header_fallback is True
     finally:
         dispose_engine()
         get_settings.cache_clear()

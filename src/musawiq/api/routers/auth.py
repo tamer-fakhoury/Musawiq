@@ -2,9 +2,25 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+import time
+
+from fastapi import APIRouter, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from musawiq.auth.login_throttle import (
+    LOCKOUT_SECONDS,
+    clear as clear_login_failures,
+    record_failure,
+    retry_after,
+)
+from musawiq.auth.session import (
+    CSRF_COOKIE,
+    SESSION_COOKIE,
+    SESSION_MAX_AGE,
+    create_session,
+    new_csrf_token,
+)
 from musawiq.auth.signup import SignupError, signup
 from musawiq.config import get_settings
 from musawiq.db.session import get_session_factory
@@ -107,6 +123,15 @@ def resend_verification(payload: ResendRequest, request: Request):
 
 @router.post("/auth/login")
 def login_user(payload: LoginRequest, request: Request):
+    wait = retry_after(payload.email)
+    if wait is not None:
+        return error_response(
+            request,
+            status_code=429,
+            code="rate_limited",
+            message="Too many sign-in attempts. Try again later.",
+            headers={"Retry-After": str(wait)},
+        )
     session = get_session_factory()()
     try:
         session.begin()
@@ -114,10 +139,64 @@ def login_user(payload: LoginRequest, request: Request):
         session.commit()
     except EmailVerificationError as exc:
         session.rollback()
+        if exc.code == "invalid_credentials":
+            record_failure(payload.email)
         return _verification_error(request, exc)
     finally:
         session.close()
-    return result
+    clear_login_failures(payload.email)
+    active_store = result.get("active_store") or {}
+    token = create_session(result["user"]["id"], active_store.get("id"))
+    csrf = new_csrf_token()
+    result["csrf_token"] = csrf
+    response = JSONResponse(result)
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        max_age=SESSION_MAX_AGE,
+        expires=int(time.time()) + SESSION_MAX_AGE,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        path="/",
+    )
+    response.set_cookie(
+        CSRF_COOKIE,
+        csrf,
+        max_age=SESSION_MAX_AGE,
+        expires=int(time.time()) + SESSION_MAX_AGE,
+        httponly=False,
+        secure=True,
+        samesite="lax",
+        path="/",
+    )
+    return response
+
+
+@router.post("/auth/logout", status_code=204)
+def logout():
+    response = Response(status_code=204)
+    response.set_cookie(
+        SESSION_COOKIE,
+        "",
+        max_age=0,
+        expires=0,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        path="/",
+    )
+    response.set_cookie(
+        CSRF_COOKIE,
+        "",
+        max_age=0,
+        expires=0,
+        httponly=False,
+        secure=True,
+        samesite="lax",
+        path="/",
+    )
+    return response
 
 
 __all__ = ["router"]

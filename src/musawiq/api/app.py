@@ -34,6 +34,8 @@ from musawiq.config import ConfigurationError, get_settings
 from musawiq.db.session import dispose_engine, get_engine
 from musawiq.middleware.tenant import (
     DevHeaderTenantProvider,
+    DevSessionTenantProvider,
+    SessionTenantProvider,
     TenantMiddleware,
     TenantProvider,
 )
@@ -74,8 +76,10 @@ def create_app(tenant_provider: TenantProvider | None = None) -> FastAPI:
             default_user_id=settings.dev_user_id,
             default_role=settings.dev_user_role,
         )
+    elif settings.app_env == "development":
+        provider = DevSessionTenantProvider()
     else:
-        provider = DevHeaderTenantProvider()
+        provider = SessionTenantProvider(allow_header_fallback=False)
 
     if settings.app_env == "production" and isinstance(
         provider, DevHeaderTenantProvider
