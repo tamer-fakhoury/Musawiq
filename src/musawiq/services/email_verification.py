@@ -228,6 +228,11 @@ def login(session: Session, email: str, password: str) -> dict[str, Any]:
             "full_name": user["full_name"],
             "role": user["role"],
             "email_verified_at": user["email_verified_at"].isoformat(),
+            "password_changed_at": (
+                user["password_changed_at"].isoformat()
+                if user.get("password_changed_at") is not None
+                else None
+            ),
         },
         "active_store": (
             {

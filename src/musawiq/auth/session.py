@@ -55,6 +55,7 @@ def _sign(payload: bytes) -> str:
 def create_session(
     user_id: uuid.UUID | str,
     store_id: uuid.UUID | str | None,
+    password_changed_at: str | None = None,
 ) -> str:
     now = int(time.time())
     payload = {
@@ -63,6 +64,7 @@ def create_session(
         "sid": str(store_id) if store_id else None,
         "user_id": str(user_id),
         "store_id": str(store_id) if store_id else None,
+        "pch": password_changed_at,
         "iat": now,
         "exp": now + SESSION_MAX_AGE,
     }

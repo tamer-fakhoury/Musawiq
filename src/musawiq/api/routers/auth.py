@@ -69,6 +69,15 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+
 def _verification_error(request: Request, exc: EmailVerificationError):
     headers = (
         {"Retry-After": str(exc.retry_after)}
@@ -146,7 +155,11 @@ def login_user(payload: LoginRequest, request: Request):
         session.close()
     clear_login_failures(payload.email)
     active_store = result.get("active_store") or {}
-    token = create_session(result["user"]["id"], active_store.get("id"))
+    token = create_session(
+        result["user"]["id"],
+        active_store.get("id"),
+        result["user"].get("password_changed_at"),
+    )
     csrf = new_csrf_token()
     result["csrf_token"] = csrf
     response = JSONResponse(result)
@@ -196,6 +209,45 @@ def logout():
         samesite="lax",
         path="/",
     )
+    return response
+
+
+@router.post("/auth/password/forgot", status_code=202)
+def forgot_password_endpoint(payload: ForgotPasswordRequest, request: Request):
+    from musawiq.auth.password_reset import forgot_password
+
+    session = get_session_factory()()
+    try:
+        session.begin()
+        result = forgot_password(session, payload.email)
+        session.commit()
+    finally:
+        session.close()
+    return {"status": "accepted"}
+
+
+@router.post("/auth/password/reset")
+def reset_password_endpoint(payload: ResetPasswordRequest, request: Request):
+    from musawiq.auth.password_reset import PasswordResetError, reset_password
+
+    session = get_session_factory()()
+    try:
+        session.begin()
+        result = reset_password(session, payload.model_dump())
+        session.commit()
+    except PasswordResetError as exc:
+        session.rollback()
+        return error_response(
+            request,
+            status_code=exc.status_code,
+            code=exc.code,
+            message=exc.message,
+        )
+    finally:
+        session.close()
+    response = JSONResponse(result)
+    for name in (SESSION_COOKIE, CSRF_COOKIE):
+        response.delete_cookie(name, path="/")
     return response
 
 

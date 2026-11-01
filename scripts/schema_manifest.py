@@ -63,6 +63,7 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("expires_at", "timestamptz"),
         ("used_at", "timestamptz"),
         ("created_at", "timestamptz"),
+        ("purpose", "text"),
     ],
     "languages": [
         ("code", "text"),
@@ -87,6 +88,7 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("deleted_at", "timestamptz"),
         ("created_at", "timestamptz"),
         ("updated_at", "timestamptz"),
+        ("password_changed_at", "timestamptz"),
     ],
     "stores": [
         ("id", "uuid"),

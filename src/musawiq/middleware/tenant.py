@@ -42,6 +42,8 @@ PUBLIC_PATHS = frozenset(
         "/auth/verify",
         "/auth/verify/resend",
         "/auth/logout",
+        "/auth/password/forgot",
+        "/auth/password/reset",
     }
 )
 PUBLIC_PREFIXES = ("/docs", "/redoc", "/p/", "/r/")
@@ -138,7 +140,8 @@ class SessionTenantProvider:
             )
             user = session.execute(
                 text(
-                    "SELECT id, role, status, email_verified_at FROM users "
+                    "SELECT id, role, status, email_verified_at, "
+                    "password_changed_at FROM users "
                     "WHERE id = :id AND deleted_at IS NULL"
                 ),
                 {"id": user_id},
@@ -148,6 +151,10 @@ class SessionTenantProvider:
                 or user["status"] != "active"
                 or user["email_verified_at"] is None
             ):
+                raise TenantResolutionError("Authentication required.")
+            changed_at = user["password_changed_at"]
+            expected = changed_at.isoformat() if changed_at is not None else None
+            if payload.get("pch") != expected:
                 raise TenantResolutionError("Authentication required.")
             store = session.execute(
                 text(
@@ -178,17 +185,7 @@ class SessionTenantProvider:
 
 
 
-class DevSessionTenantProvider(DevHeaderTenantProvider):
-    """Development provider that prefers a signed session cookie."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._session = SessionTenantProvider(allow_header_fallback=True)
-
-    def resolve(self, request: Request) -> TenantContext:
-        if SESSION_COOKIE_NAME in request.cookies:
-            return self._session.resolve(request)
-        return super().resolve(request)
+DevSessionTenantProvider = SessionTenantProvider
 
 
 def error_envelope(
