@@ -124,3 +124,6 @@ router.include_router(unit_economics_router)
 from musawiq.api.routers.investment import router as investment_router
 
 router.include_router(investment_router)
+from musawiq.api.routers.auth import router as auth_router
+
+router.include_router(auth_router)

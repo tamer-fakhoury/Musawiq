@@ -54,6 +54,16 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("description", "text"),
         ("is_active", "boolean"),
     ],
+    "email_verification_tokens": [
+        ("id", "uuid"),
+        ("user_id", "uuid"),
+        ("email", "text"),
+        ("token_hash", "text"),
+        ("source", "text"),
+        ("expires_at", "timestamptz"),
+        ("used_at", "timestamptz"),
+        ("created_at", "timestamptz"),
+    ],
     "languages": [
         ("code", "text"),
         ("name", "text"),

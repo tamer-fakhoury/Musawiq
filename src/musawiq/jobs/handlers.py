@@ -24,6 +24,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "import": noop,
     "batch_evaluation": run_batch_evaluation_job,
     "page_generation": run_page_generation_job,
+    "email_verification": noop,
     "recommendation_generation": run_recommendation_generation_job,
 }
 

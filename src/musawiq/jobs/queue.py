@@ -23,6 +23,7 @@ VALID_JOB_TYPES = frozenset(
         "recommendation_generation",
         "content_generation",
         "batch_evaluation",
+        "email_verification",
     }
 )
 
