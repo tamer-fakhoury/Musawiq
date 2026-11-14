@@ -39,6 +39,7 @@ const MESSAGES = {
     "nav.metrics": "المؤشرات",
     "nav.verdicts": "أحكام الاختبار",
     "nav.investment": "الاستثمار",
+    "nav.settings": "الإعدادات",
     "app.subtitle": "حلقة تحسين الإعلانات",
     "app.logout": "تسجيل الخروج",
     "app.loggingOut": "جارٍ الخروج...",
@@ -116,6 +117,13 @@ const MESSAGES = {
     "onboarding.sessionExpired": "انتهت صلاحية الجلسة أو رمز الحماية. يرجى تسجيل الدخول مرة أخرى.",
     "onboarding.loginAgain": "تسجيل الدخول من جديد",
     "onboarding.failed": "تعذر إنشاء المتجر. حاول مرة أخرى.",
+    "settings.title": "إعدادات المتجر",
+    "settings.subtitle": "اختر العملة التي تظهر بها الأسعار والميزانيات.",
+    "settings.currency": "العملة",
+    "settings.save": "حفظ العملة",
+    "settings.saving": "جارٍ الحفظ...",
+    "settings.saved": "تم حفظ العملة.",
+    "settings.csrfExpired": "انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.",
   },
   en: {
     __unavailable: "Unavailable",
@@ -140,6 +148,7 @@ const MESSAGES = {
     "nav.metrics": "Metrics",
     "nav.verdicts": "Verdict KPIs",
     "nav.investment": "Investment",
+    "nav.settings": "Settings",
     "app.subtitle": "Advertising optimization loop",
     "app.logout": "Log out",
     "app.loggingOut": "Logging out...",
@@ -217,6 +226,13 @@ const MESSAGES = {
     "onboarding.sessionExpired": "Your session or security token expired. Please log in again.",
     "onboarding.loginAgain": "Log in again",
     "onboarding.failed": "Could not create the store. Try again.",
+    "settings.title": "Store settings",
+    "settings.subtitle": "Choose the currency used for prices and budgets.",
+    "settings.currency": "Currency",
+    "settings.save": "Save currency",
+    "settings.saving": "Saving...",
+    "settings.saved": "Currency saved.",
+    "settings.csrfExpired": "Your session expired. Please log in again.",
   },
 } as const;
 
@@ -241,11 +257,23 @@ export function formatNumber(value: number, options?: Intl.NumberFormatOptions) 
   );
 }
 
+const MINOR_UNITS: Record<string, number> = {
+  SAR: 2,
+  ILS: 2,
+  USD: 2,
+  EUR: 2,
+  JPY: 0,
+  KWD: 3,
+  BHD: 3,
+  JOD: 3,
+  OMR: 3,
+};
+
 export function formatCurrency(minor: number, currency: string): string {
   return new Intl.NumberFormat(activeLocale === "ar" ? "ar" : "en-GB", {
     style: "currency",
     currency,
-  }).format(minor / 100);
+  }).format(minor / 10 ** (MINOR_UNITS[currency] ?? 2));
 }
 
 type LanguageContextValue = {
@@ -258,7 +286,9 @@ const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 function storedLocale(): Locale {
   if (typeof window === "undefined") return "ar";
-  return window.localStorage.getItem(STORAGE_KEY) === "en" ? "en" : "ar";
+  const stored = window.localStorage.getItem(STORAGE_KEY);
+  if (stored === "en" || stored === "ar") return stored;
+  return document.documentElement.lang === "en" ? "en" : "ar";
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
@@ -267,16 +297,17 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initial = storedLocale();
     activeLocale = initial;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocaleState(initial);
     document.documentElement.lang = initial;
     document.documentElement.dir = initial === "ar" ? "rtl" : "ltr";
-    const timer = window.setTimeout(() => setLocaleState(initial), 0);
-    return () => window.clearTimeout(timer);
   }, []);
 
   const setLocale = useCallback((next: Locale) => {
     activeLocale = next;
     setLocaleState(next);
     window.localStorage.setItem(STORAGE_KEY, next);
+    document.cookie = `msq_locale=${next}; path=/; max-age=31536000; samesite=lax`;
     document.documentElement.lang = next;
     document.documentElement.dir = next === "ar" ? "rtl" : "ltr";
   }, []);
