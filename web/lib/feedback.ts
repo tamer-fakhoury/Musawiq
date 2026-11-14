@@ -1,3 +1,5 @@
+import { formatDate as formatDateLocale } from "@/lib/i18n";
+
 export type FeedbackSource = "manual" | "file";
 export type FeedbackSentiment = "positive" | "neutral" | "negative";
 
@@ -32,5 +34,5 @@ export function sourceLabel(value: string): string {
 }
 
 export function formatDate(value: string): string {
-  return value.slice(0, 10);
+  return formatDateLocale(value);
 }

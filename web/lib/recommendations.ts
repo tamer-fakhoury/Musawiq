@@ -1,3 +1,5 @@
+import { formatDate as formatDateLocale } from "@/lib/i18n";
+
 export type GenerationRun = {
   id: string;
   requested_by: string;
@@ -65,5 +67,5 @@ export function ideaStateLabel(value: string): string {
 }
 
 export function formatDate(value: string | null): string {
-  return value ? value.slice(0, 10) : "—";
+  return formatDateLocale(value);
 }

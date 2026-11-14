@@ -1,3 +1,5 @@
+import { localizeApiError } from "@/lib/error-codes";
+
 export type ApiErrorBody = {
   error: {
     code: string;
@@ -10,16 +12,23 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly correlationId: string;
+  readonly retryAfter?: number;
 
   constructor(
     message: string,
-    options: { status: number; code: string; correlationId: string },
+    options: {
+      status: number;
+      code: string;
+      correlationId: string;
+      retryAfter?: number;
+    },
   ) {
     super(message);
     this.name = "ApiError";
     this.status = options.status;
     this.code = options.code;
     this.correlationId = options.correlationId;
+    this.retryAfter = options.retryAfter;
   }
 }
 
@@ -59,6 +68,31 @@ function demoHeaders(init?: HeadersInit): Headers {
   return headers;
 }
 
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
+}
+
+const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const AUTH_PAGES = ["/login", "/signup", "/forgot-password"];
+
+function requestHeaders(init?: RequestInit): Headers {
+  const headers = demoHeaders(init?.headers);
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (UNSAFE_METHODS.has(method)) {
+    const csrf = readCookie("msq_csrf");
+    if (csrf) {
+      headers.set("X-CSRF-Token", csrf);
+    }
+  }
+  return headers;
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
@@ -73,8 +107,9 @@ export async function apiFetch<T>(
   }
 
   const response = await fetch(`${baseUrl}${path}`, {
+    credentials: "include",
     ...init,
-    headers: demoHeaders(init?.headers),
+    headers: requestHeaders(init),
   });
 
   if (!response.ok) {
@@ -86,14 +121,30 @@ export async function apiFetch<T>(
     }
 
     const envelope = isApiErrorBody(body) ? body.error : null;
-    throw new ApiError(
-      envelope?.message ?? `Request failed with status ${response.status}`,
+    const retryHeader = response.headers.get("Retry-After");
+    const error = new ApiError(
+      localizeApiError(envelope?.code ?? "http_error"),
       {
         status: response.status,
         code: envelope?.code ?? "http_error",
         correlationId: envelope?.correlation_id ?? "",
+        retryAfter: retryHeader ? Number(retryHeader) : undefined,
       },
     );
+
+    if (
+      response.status === 401 &&
+      typeof window !== "undefined" &&
+      !AUTH_PAGES.includes(window.location.pathname) &&
+      !path.startsWith("/auth/")
+    ) {
+      const next = encodeURIComponent(
+        window.location.pathname + window.location.search,
+      );
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign(`/login?next=${next}`);
+    }
+    throw error;
   }
 
   if (response.status === 204) {

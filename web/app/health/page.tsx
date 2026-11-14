@@ -29,7 +29,7 @@ export default async function HealthPage() {
 
   return (
     <main className="p-8">
-      <h1 className="text-lg font-semibold">API health</h1>
+      <h1 className="text-lg font-semibold">حالة الخدمة</h1>
       <p className="mt-4 text-sm">
         Status: <strong>{state}</strong>
       </p>

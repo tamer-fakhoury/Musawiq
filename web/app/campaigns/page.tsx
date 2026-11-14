@@ -33,6 +33,12 @@ export default function CampaignsPage() {
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [createdMessage, setCreatedMessage] = useState<string | null>(null);
+  const [preflight, setPreflight] = useState<{
+    valid: boolean;
+    unresolved: { code: string; message: string }[];
+  } | null>(null);
+  const [publishMessage, setPublishMessage] = useState<string | null>(null);
+  const [publishBusy, setPublishBusy] = useState(false);
 
   const loadCampaigns = useCallback(async () => {
     setLoading(true);
@@ -97,6 +103,46 @@ export default function CampaignsPage() {
       }),
     });
     await openCampaign(detail.id);
+  }
+
+  async function runPreflight() {
+    if (!detail) return;
+    setPublishMessage(null);
+    try {
+      setPreflight(
+        await apiFetch<{
+          valid: boolean;
+          unresolved: { code: string; message: string }[];
+        }>(`/campaigns/${detail.id}/preflight`),
+      );
+    } catch {
+      setPublishMessage("تعذر تشغيل فحص النشر.");
+    }
+  }
+
+  async function publishCampaign() {
+    if (!detail) return;
+    if (!preflight?.valid) {
+      setPublishMessage("يجب نجاح فحص النشر قبل النشر.");
+      return;
+    }
+    setPublishBusy(true);
+    setPublishMessage(null);
+    try {
+      await apiFetch(`/campaigns/${detail.id}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: true }),
+      });
+      setPublishMessage("تم النشر.");
+      await openCampaign(detail.id);
+    } catch (error) {
+      setPublishMessage(
+        error instanceof Error ? error.message : "تعذر النشر.",
+      );
+    } finally {
+      setPublishBusy(false);
+    }
   }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -411,6 +457,44 @@ export default function CampaignsPage() {
                     >
                       تحليل الإشارات
                     </Link>
+                  </div>
+                  <div className="mt-4 rounded-md border border-zinc-200 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void runPreflight()}
+                        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+                      >
+                        فحص النشر
+                      </button>
+                      <button
+                        type="button"
+                        disabled={publishBusy || !preflight?.valid}
+                        onClick={() => void publishCampaign()}
+                        className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                      >
+                        {publishBusy ? "جارٍ النشر…" : "نشر الحملة"}
+                      </button>
+                    </div>
+                    {preflight ? (
+                      <div className="mt-3 text-sm">
+                        <p className={preflight.valid ? "text-green-700" : "text-red-700"}>
+                          {preflight.valid ? "الفحص ناجح." : "توجد مشكلات تمنع النشر."}
+                        </p>
+                        {preflight.unresolved.length > 0 ? (
+                          <ul className="mt-1 list-inside list-disc text-xs text-red-700">
+                            {preflight.unresolved.map((item) => (
+                              <li key={`${item.code}-${item.message}`}>
+                                {item.code}: {item.message}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {publishMessage ? (
+                      <p className="mt-2 text-sm text-zinc-700">{publishMessage}</p>
+                    ) : null}
                   </div>
                 </div>
 

@@ -1,3 +1,5 @@
+import { formatCurrency, formatDate as formatDateLocale } from "@/lib/i18n";
+
 export type Campaign = {
   id: string;
   name: string;
@@ -90,11 +92,11 @@ export function statusLabel(value: string): string {
 }
 
 export function formatMoney(minor: number, currency: string): string {
-  return `${(minor / 100).toFixed(2)} ${currency}`;
+  return formatCurrency(minor, currency);
 }
 
 export function formatDate(value: string): string {
-  return value.slice(0, 10);
+  return formatDateLocale(value);
 }
 
 export function variationLabel(variation: AdVariation): string {

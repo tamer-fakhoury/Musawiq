@@ -23,6 +23,7 @@ export type LandingPage = {
     cod_form_schema: Record<string, unknown> | null;
     attribution_token: string;
     whatsapp_link: string | null;
+    whatsapp_destination?: string | null;
   } | null;
 };
 
