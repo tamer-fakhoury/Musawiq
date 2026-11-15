@@ -24,6 +24,7 @@ const NAV_ITEMS: Array<{ key: MessageKey; href: string }> = [
   { key: "nav.metrics", href: "/metrics" },
   { key: "nav.verdicts", href: "/verdicts" },
   { key: "nav.investment", href: "/investment" },
+  { key: "nav.settings", href: "/settings" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -61,7 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
           </ul>
         </nav>
-        <main className="flex-1 p-4 text-base sm:p-6">{children}</main>
+        <main className="min-w-0 flex-1 p-4 text-base sm:p-6">{children}</main>
       </div>
     </div>
   );
